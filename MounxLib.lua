@@ -6,10 +6,21 @@ local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 -- ==================================================
 -- TEMA PERSONALIZADO "MOUNX" POR DEFECTO
 -- ==================================================
--- Puedes cambiar estos colores cuando quieras
-Library.AccentColor = Color3.fromRGB(168, 85, 247) -- Morado Mounx
-Library.MainColor = Color3.fromRGB(20, 20, 25) -- Fondo oscuro elegante
+Library.AccentColor = Color3.fromRGB(168, 85, 247) 
+Library.MainColor = Color3.fromRGB(20, 20, 25)
 Library.FontColor = Color3.fromRGB(255, 255, 255)
+
+-- Agregando tus temas personalizados a ThemeManager
+ThemeManager.BuiltInThemes['Dark Neon'] = { 9, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"0a0a0a","AccentColor":"00ff88","BackgroundColor":"050505","OutlineColor":"1a1a1a"}') }
+ThemeManager.BuiltInThemes['Bloody Red'] = { 10, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"140000","AccentColor":"ff0000","BackgroundColor":"0a0000","OutlineColor":"280000"}') }
+ThemeManager.BuiltInThemes['Deep Ocean'] = { 11, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"000a14","AccentColor":"0088ff","BackgroundColor":"00050a","OutlineColor":"001428"}') }
+ThemeManager.BuiltInThemes['Cyberpunk'] = { 12, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"1a001a","AccentColor":"ff00ff","BackgroundColor":"0d000d","OutlineColor":"330033"}') }
+ThemeManager.BuiltInThemes['Gold Luxury'] = { 13, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"141100","AccentColor":"ffd700","BackgroundColor":"0a0900","OutlineColor":"282200"}') }
+ThemeManager.BuiltInThemes['Amethyst'] = { 14, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"0f0a14","AccentColor":"9b59b6","BackgroundColor":"0a0510","OutlineColor":"1e1428"}') }
+ThemeManager.BuiltInThemes['Emerald'] = { 15, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"0a140f","AccentColor":"2ecc71","BackgroundColor":"050a08","OutlineColor":"14281e"}') }
+ThemeManager.BuiltInThemes['Crimson Night'] = { 16, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffdddd","MainColor":"110000","AccentColor":"dc143c","BackgroundColor":"050000","OutlineColor":"220000"}') }
+ThemeManager.BuiltInThemes['Ice White'] = { 17, game:GetService("HttpService"):JSONDecode('{"FontColor":"000000","MainColor":"f0f5ff","AccentColor":"00aaff","BackgroundColor":"ffffff","OutlineColor":"d0e0ff"}') }
+
 
 local MounxHub = {}
 MounxHub.Library = Library
@@ -25,6 +36,8 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     
     MenuGroup:AddButton('Unload Script', function() Library:Unload() end)
     MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'RightControl', NoUI = true, Text = 'Menu keybind' })
+    
+    -- Corrección: Usar Library.Options
     Library.ToggleKeybind = Library.Options.MenuKeybind
     
     -- 2. CONFIGURAR THEME Y SAVE MANAGER
@@ -35,7 +48,8 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     SaveManager:SetFolder('MounxHub/' .. (ConfigFolderName or 'GeneralConfigs'))
     
     SaveManager:BuildConfigSection(SettingsTab)
-    ThemeManager:BuildThemeSection(SettingsTab)
+    -- Corrección: ThemeManager usa ApplyToTab en esta versión de Linoria, no BuildThemeSection
+    ThemeManager:ApplyToTab(SettingsTab)
     
     -- 3. INYECTAR ADAPTADOR MÓVIL AUTOMÁTICAMENTE
     local UserInputService = game:GetService("UserInputService")
@@ -114,5 +128,3 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
-
-
