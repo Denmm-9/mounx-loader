@@ -65,7 +65,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
             uiScale.Parent = Library.ScreenGui
             local function updateScale()
                 local vpY = camera.ViewportSize.Y
-                if vpY < 650 then uiScale.Scale = math.clamp(vpY / 700, 0.55, 1) else uiScale.Scale = 1 end
+                if vpY < 650 then uiScale.Scale = math.clamp(vpY / 600, 0.75, 1) else uiScale.Scale = 1 end
             end
             updateScale()
             camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
@@ -83,7 +83,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         btn.Size = UDim2.new(0, 48, 0, 48)
         btn.Position = UDim2.new(0, 15, 0.5, -24)
         btn.BackgroundColor3 = Library.MainColor
-        btn.Text = "M"
+        btn.Text = ""
         btn.TextColor3 = Library.AccentColor
         btn.TextSize = 24
         btn.Font = Enum.Font.GothamBold
@@ -128,3 +128,4 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
