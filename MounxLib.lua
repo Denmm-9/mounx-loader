@@ -4,13 +4,13 @@ local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 -- ==================================================
--- TEMA PERSONALIZADO "MOUNX" POR DEFECTO
+-- TEMAS PERSONALIZADOS MOUNX
 -- ==================================================
 Library.AccentColor = Color3.fromRGB(168, 85, 247) 
 Library.MainColor = Color3.fromRGB(20, 20, 25)
 Library.FontColor = Color3.fromRGB(255, 255, 255)
 
--- Agregando tus temas personalizados a ThemeManager
+ThemeManager.BuiltInThemes['Mounx Default'] = { 1, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"141419","AccentColor":"a855f7","BackgroundColor":"0a0a0f","OutlineColor":"1e1e28"}') }
 ThemeManager.BuiltInThemes['Dark Neon'] = { 9, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"0a0a0a","AccentColor":"00ff88","BackgroundColor":"050505","OutlineColor":"1a1a1a"}') }
 ThemeManager.BuiltInThemes['Bloody Red'] = { 10, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"140000","AccentColor":"ff0000","BackgroundColor":"0a0000","OutlineColor":"280000"}') }
 ThemeManager.BuiltInThemes['Deep Ocean'] = { 11, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"000a14","AccentColor":"0088ff","BackgroundColor":"00050a","OutlineColor":"001428"}') }
@@ -48,11 +48,13 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     SaveManager:BuildConfigSection(SettingsTab)
     ThemeManager:ApplyToTab(SettingsTab)
     
-    -- 3. OCULTAR OPCIONES MOLESTAS (.webm video background)
+    -- 3. FORZAR EL TEMA MOUNX DEFAULT
+    ThemeManager:ApplyTheme('Mounx Default')
+    
+    -- 4. OCULTAR OPCIONES MOLESTAS (.webm video background)
     pcall(function()
         if Library.Options.VideoLink then
-            -- Ocultar el contenedor visual del Input
-            Library.Options.VideoLink.Container.Visible = false
+            Library.Options.VideoLink:SetVisible(false)
         end
     end)
 end
