@@ -25,7 +25,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     
     MenuGroup:AddButton('Unload Script', function() Library:Unload() end)
     MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'RightControl', NoUI = true, Text = 'Menu keybind' })
-    Library.ToggleKeybind = Options.MenuKeybind
+    Library.ToggleKeybind = getgenv().Options.MenuKeybind
     
     -- 2. CONFIGURAR THEME Y SAVE MANAGER
     ThemeManager:SetLibrary(Library)
@@ -114,3 +114,4 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
