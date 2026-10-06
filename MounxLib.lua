@@ -35,12 +35,13 @@ MounxHub.SaveManager = SaveManager
 local function ApplyMounxStyle(Library)
     if not Library or not Library.ScreenGui then return end
     local gui = Library.ScreenGui
+    local TweenService = game:GetService("TweenService")
     
     local Config = {
-        WindowRadius = 12,
-        GroupRadius = 6,
-        ControlRadius = 5,
-        ShadowTransparency = 0.5,
+        WindowRadius = 14,
+        GroupRadius = 8,
+        ControlRadius = 6,
+        ShadowTransparency = 0.4,
     }
 
     local function addCorner(obj, rad)
@@ -53,13 +54,41 @@ local function ApplyMounxStyle(Library)
         end
     end
 
+    local function applyHoverEffect(obj, cornerRad)
+        if not obj or obj:FindFirstChild("MounxHover") then return end
+        local hoverFrame = Instance.new("Frame")
+        hoverFrame.Name = "MounxHover"
+        hoverFrame.Size = UDim2.new(1, 0, 1, 0)
+        hoverFrame.BackgroundColor3 = Color3.new(1, 1, 1) -- Blanco
+        hoverFrame.BackgroundTransparency = 1 
+        hoverFrame.BorderSizePixel = 0
+        hoverFrame.ZIndex = obj.ZIndex + 2
+        hoverFrame.Parent = obj
+        
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, cornerRad)
+        c.Parent = hoverFrame
+        
+        local tweenIn = TweenService:Create(hoverFrame, TweenInfo.new(0.15), {BackgroundTransparency = 0.88})
+        local tweenOut = TweenService:Create(hoverFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1})
+        
+        obj.MouseEnter:Connect(function() tweenIn:Play() end)
+        obj.MouseLeave:Connect(function() tweenOut:Play() end)
+        obj.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then tweenIn:Play() end
+        end)
+        obj.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then tweenOut:Play() end
+        end)
+    end
+
     local function addShadow(obj)
         if not obj or obj:FindFirstChild("MounxShadow") then return end
         local shadow = Instance.new("ImageLabel")
         shadow.Name = "MounxShadow"
         shadow.AnchorPoint = Vector2.new(0.5, 0.5)
         shadow.Position = UDim2.fromScale(0.5, 0.5)
-        shadow.Size = UDim2.new(1, 40, 1, 40)
+        shadow.Size = UDim2.new(1, 50, 1, 50)
         shadow.BackgroundTransparency = 1
         shadow.Image = "rbxassetid://6014261993"
         shadow.ImageColor3 = Color3.new(0, 0, 0)
@@ -71,7 +100,6 @@ local function ApplyMounxStyle(Library)
     local function styleObj(obj)
         if not obj then return end
         
-        -- CAMBIO DE FUENTE a GothamMedium
         if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
             pcall(function() 
                 if obj.Font == Enum.Font.Code or obj.Font == Enum.Font.SourceSans then
@@ -82,7 +110,6 @@ local function ApplyMounxStyle(Library)
 
         if not obj:IsA("Frame") then return end
 
-        -- VENTANA PRINCIPAL
         if obj.Name == "Window" then
             addCorner(obj, Config.WindowRadius)
             addShadow(obj)
@@ -96,8 +123,6 @@ local function ApplyMounxStyle(Library)
                         if subChild:IsA("Frame") then
                             addCorner(subChild, Config.WindowRadius - 2)
                             subChild.BorderSizePixel = 0
-                            
-                            -- Eliminar línea fea superior de LinoriaLib
                             for _, topBar in ipairs(subChild:GetChildren()) do
                                 if topBar:IsA("Frame") and topBar.Size.Y.Offset == 1 then
                                     topBar.Visible = false
@@ -110,7 +135,6 @@ local function ApplyMounxStyle(Library)
             return
         end
 
-        -- CONTENEDORES CON NOMBRE (Si Linoria les puso nombre)
         local name = obj.Name
         if name == "TabContainer" or name == "MainSectionOuter" or name == "MainSectionInner" or name == "BoxOuter" or name == "BoxInner" then
             addCorner(obj, Config.GroupRadius)
@@ -121,16 +145,30 @@ local function ApplyMounxStyle(Library)
                 grad.Rotation = 90
                 grad.Color = ColorSequence.new({
                     ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
-                    ColorSequenceKeypoint.new(1, Color3.new(0.92, 0.92, 0.92))
+                    ColorSequenceKeypoint.new(1, Color3.new(0.95, 0.95, 0.95))
                 })
                 grad.Parent = obj
             end
         end
 
-        -- DEDUCCION DE CONTROLES POR TAMAÑO (Ya que Linoria los nombra "Frame")
-        -- 1. Checkboxes (Toggles): tamaño 13x13 (Outer)
+        -- Eliminar lineas duras y hacer Highlights premium (difuminados a los bordes)
+        if obj.Size == UDim2.new(1, 0, 0, 2) and obj.Parent and obj.Parent.Name == "BoxInner" then
+            if not obj:FindFirstChild("FadeGrad") then
+                local g = Instance.new("UIGradient")
+                g.Name = "FadeGrad"
+                g.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 1),
+                    NumberSequenceKeypoint.new(0.5, 0),
+                    NumberSequenceKeypoint.new(1, 1)
+                })
+                g.Parent = obj
+                addCorner(obj, 100)
+            end
+        end
+
+        -- Checkboxes
         if obj.Size == UDim2.new(0, 13, 0, 13) then
-            addCorner(obj, 100) -- Redondo total
+            addCorner(obj, 100)
             obj.BorderSizePixel = 0
             for _, inner in ipairs(obj:GetChildren()) do
                 if inner:IsA("Frame") then
@@ -138,9 +176,13 @@ local function ApplyMounxStyle(Library)
                     inner.BorderSizePixel = 0
                 end
             end
+            -- Hover al recuadro invisible entero del toggle (su padre Label)
+            if obj.Parent and obj.Parent:IsA("TextLabel") then
+                applyHoverEffect(obj.Parent, Config.ControlRadius)
+            end
         end
 
-        -- 2. Sliders: tamaño 1, -4, 0, 13
+        -- Sliders
         if obj.Size == UDim2.new(1, -4, 0, 13) then
             addCorner(obj, Config.ControlRadius)
             obj.BorderSizePixel = 0
@@ -148,18 +190,22 @@ local function ApplyMounxStyle(Library)
                 if inner:IsA("Frame") then
                     addCorner(inner, Config.ControlRadius)
                     inner.BorderSizePixel = 0
-                    -- La barra de progreso dentro del slider:
                     for _, fill in ipairs(inner:GetChildren()) do
                         if fill:IsA("Frame") then
-                            addCorner(fill, Config.ControlRadius)
-                            fill.BorderSizePixel = 0
+                            if fill.Size.X.Offset == 1 and fill.Size.X.Scale == 0 then
+                                fill.BackgroundTransparency = 1 -- Hide ugly line |
+                            else
+                                addCorner(fill, Config.ControlRadius)
+                                fill.BorderSizePixel = 0
+                            end
                         end
                     end
                 end
             end
+            applyHoverEffect(obj, Config.ControlRadius)
         end
 
-        -- 3. Botones y Dropdowns grandes: Tamaño aprox 1, -4, 0, 20
+        -- Botones y Dropdowns
         if obj.Size == UDim2.new(1, -4, 0, 20) or obj.Size == UDim2.new(1, -4, 0, 22) or obj.Size == UDim2.new(1, 0, 0, 20) then
             addCorner(obj, Config.ControlRadius)
             obj.BorderSizePixel = 0
@@ -169,24 +215,26 @@ local function ApplyMounxStyle(Library)
                     inner.BorderSizePixel = 0
                 end
             end
+            applyHoverEffect(obj, Config.ControlRadius)
         end
         
-        -- 4. ColorPickers: tamaño 0, 14, 0, 14
+        -- ColorPickers
         if obj.Size == UDim2.new(0, 14, 0, 14) or obj.Size == UDim2.new(0, 20, 0, 14) then
             addCorner(obj, 4)
             obj.BorderSizePixel = 0
+            applyHoverEffect(obj, 4)
         end
 
-        -- Botones de las Tabs (en la parte superior o izquierda)
+        -- Botones Tabs
         if obj:IsA("TextButton") and obj.Parent and obj.Parent.Name == "TabboxButtons" then
             addCorner(obj, 6)
             obj.BorderSizePixel = 0
+            applyHoverEffect(obj, 6)
         end
 
-        -- ScrollFrame más invisible y delgado para móvil
         if obj:IsA("ScrollingFrame") then
             obj.ScrollBarThickness = 1
-            obj.ScrollBarImageTransparency = 0.6
+            obj.ScrollBarImageTransparency = 0.8
         end
     end
 
@@ -220,4 +268,6 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
+
 
