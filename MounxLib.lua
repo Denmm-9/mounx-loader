@@ -71,7 +71,7 @@ local function ApplyMounxStyle(Library)
     local function styleObj(obj)
         if not obj then return end
         
-        -- CAMBIO DE FUENTE (De Code/Roboto a GothamMedium para un look premium)
+        -- CAMBIO DE FUENTE a GothamMedium
         if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
             pcall(function() 
                 if obj.Font == Enum.Font.Code or obj.Font == Enum.Font.SourceSans then
@@ -81,10 +81,9 @@ local function ApplyMounxStyle(Library)
         end
 
         if not obj:IsA("Frame") then return end
-        local name = obj.Name
 
-        -- REDISEÑO COMPLETO DE VENTANA Y LIMPIEZA
-        if name == "Window" then
+        -- VENTANA PRINCIPAL
+        if obj.Name == "Window" then
             addCorner(obj, Config.WindowRadius)
             addShadow(obj)
             obj.BorderSizePixel = 0
@@ -98,7 +97,7 @@ local function ApplyMounxStyle(Library)
                             addCorner(subChild, Config.WindowRadius - 2)
                             subChild.BorderSizePixel = 0
                             
-                            -- Eliminar la línea top de LinoriaLib
+                            -- Eliminar línea fea superior de LinoriaLib
                             for _, topBar in ipairs(subChild:GetChildren()) do
                                 if topBar:IsA("Frame") and topBar.Size.Y.Offset == 1 then
                                     topBar.Visible = false
@@ -108,39 +107,82 @@ local function ApplyMounxStyle(Library)
                     end
                 end
             end
+            return
         end
 
+        -- CONTENEDORES CON NOMBRE (Si Linoria les puso nombre)
+        local name = obj.Name
         if name == "TabContainer" or name == "MainSectionOuter" or name == "MainSectionInner" or name == "BoxOuter" or name == "BoxInner" then
             addCorner(obj, Config.GroupRadius)
             obj.BorderSizePixel = 0
             
-            -- Añadir un sutil gradiente a las cajas interiores para dar profundidad de lujo
             if (name == "BoxInner" or name == "MainSectionInner") and not obj:FindFirstChildOfClass("UIGradient") then
                 local grad = Instance.new("UIGradient")
                 grad.Rotation = 90
                 grad.Color = ColorSequence.new({
                     ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
-                    ColorSequenceKeypoint.new(1, Color3.new(0.9, 0.9, 0.9))
+                    ColorSequenceKeypoint.new(1, Color3.new(0.92, 0.92, 0.92))
                 })
                 grad.Parent = obj
             end
         end
 
-        if name == "Button" or name == "Slider" or name == "Dropdown" or name == "List" or name == "ColorPicker" or name == "Toggle" then
-            addCorner(obj, Config.ControlRadius)
-        end
-        
-        if name == "SliderOuter" or name == "SliderInner" then
-            addCorner(obj, Config.ControlRadius)
-            obj.BorderSizePixel = 0
-        end
-        
-        -- INDICADORES (Las casillas de los Checkboxes) ahora son circulares
-        if name == "Indicator" then
+        -- DEDUCCION DE CONTROLES POR TAMAÑO (Ya que Linoria los nombra "Frame")
+        -- 1. Checkboxes (Toggles): tamaño 13x13 (Outer)
+        if obj.Size == UDim2.new(0, 13, 0, 13) then
             addCorner(obj, 100) -- Redondo total
             obj.BorderSizePixel = 0
+            for _, inner in ipairs(obj:GetChildren()) do
+                if inner:IsA("Frame") then
+                    addCorner(inner, 100)
+                    inner.BorderSizePixel = 0
+                end
+            end
+        end
+
+        -- 2. Sliders: tamaño 1, -4, 0, 13
+        if obj.Size == UDim2.new(1, -4, 0, 13) then
+            addCorner(obj, Config.ControlRadius)
+            obj.BorderSizePixel = 0
+            for _, inner in ipairs(obj:GetChildren()) do
+                if inner:IsA("Frame") then
+                    addCorner(inner, Config.ControlRadius)
+                    inner.BorderSizePixel = 0
+                    -- La barra de progreso dentro del slider:
+                    for _, fill in ipairs(inner:GetChildren()) do
+                        if fill:IsA("Frame") then
+                            addCorner(fill, Config.ControlRadius)
+                            fill.BorderSizePixel = 0
+                        end
+                    end
+                end
+            end
+        end
+
+        -- 3. Botones y Dropdowns grandes: Tamaño aprox 1, -4, 0, 20
+        if obj.Size == UDim2.new(1, -4, 0, 20) or obj.Size == UDim2.new(1, -4, 0, 22) or obj.Size == UDim2.new(1, 0, 0, 20) then
+            addCorner(obj, Config.ControlRadius)
+            obj.BorderSizePixel = 0
+            for _, inner in ipairs(obj:GetChildren()) do
+                if inner:IsA("Frame") then
+                    addCorner(inner, Config.ControlRadius)
+                    inner.BorderSizePixel = 0
+                end
+            end
         end
         
+        -- 4. ColorPickers: tamaño 0, 14, 0, 14
+        if obj.Size == UDim2.new(0, 14, 0, 14) or obj.Size == UDim2.new(0, 20, 0, 14) then
+            addCorner(obj, 4)
+            obj.BorderSizePixel = 0
+        end
+
+        -- Botones de las Tabs (en la parte superior o izquierda)
+        if obj:IsA("TextButton") and obj.Parent and obj.Parent.Name == "TabboxButtons" then
+            addCorner(obj, 6)
+            obj.BorderSizePixel = 0
+        end
+
         -- ScrollFrame más invisible y delgado para móvil
         if obj:IsA("ScrollingFrame") then
             obj.ScrollBarThickness = 1
@@ -178,3 +220,4 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
