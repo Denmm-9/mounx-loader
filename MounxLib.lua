@@ -3,11 +3,11 @@ local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
--- Ocultar el UI inmediatamente para evitar el "Flash" (FOUC)
+-- Prevent FOUC (Flash)
 pcall(function() if Library.ScreenGui then Library.ScreenGui.Enabled = false end end)
 
 -- ==================================================
--- TEMAS PERSONALIZADOS MOUNX (V6)
+-- MOUNX CUSTOM THEMES (V7)
 -- ==================================================
 ThemeManager.BuiltInThemes['Default'] = nil
 ThemeManager.BuiltInThemes['Mounx Default'] = { 1, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"141419","AccentColor":"a855f7","BackgroundColor":"0a0a0f","OutlineColor":"0a0a0f"}') }
@@ -18,7 +18,7 @@ MounxHub.ThemeManager = ThemeManager
 MounxHub.SaveManager = SaveManager
 
 --// ============================================================
---// MOUNX STYLE ENGINE (PREMIUM V6)
+--// MOUNX STYLE ENGINE (PREMIUM V7)
 --// ============================================================
 local function ApplyMounxStyle(Library)
     if not Library or not Library.ScreenGui then return end
@@ -41,7 +41,7 @@ local function ApplyMounxStyle(Library)
         end
     end
 
-    -- HOVER PROFESIONAL (Borde luminoso de AccentColor, nada de fondos transparentes feos)
+    -- HOVER V7: Very fine, elegant line
     local function applyProHover(obj)
         if not obj or obj:FindFirstChild("ProHover") then return end
         local stroke = Instance.new("UIStroke")
@@ -49,11 +49,11 @@ local function ApplyMounxStyle(Library)
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         stroke.Color = Library.AccentColor or Color3.fromRGB(179, 102, 255)
         stroke.Transparency = 1
-        stroke.Thickness = 1.2
+        stroke.Thickness = 1
         stroke.Parent = obj
         
-        local tIn = TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0})
-        local tOut = TweenService:Create(stroke, TweenInfo.new(0.35), {Transparency = 1})
+        local tIn = TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.2})
+        local tOut = TweenService:Create(stroke, TweenInfo.new(0.4), {Transparency = 1})
 
         obj.MouseEnter:Connect(function() tIn:Play() end)
         obj.MouseLeave:Connect(function() tOut:Play() end)
@@ -67,44 +67,51 @@ local function ApplyMounxStyle(Library)
         if not obj:IsA("Frame") and not obj:IsA("TextButton") and not obj:IsA("TextLabel") then return end
         local name = obj.Name
 
-        -- SOLUCIÓN BOTONES MÓVIL (Esquinas grises muertas)
-        if name:match("ToggleUI") or name:match("LockUI") then
+        -- MOBILE FIXES (Total wipeout of square borders)
+        if name == "ToggleUIOuter" or name == "ToggleUIInner" or name == "ToggleUIInnerFrame" or name == "LockUIOuter" or name == "LockUIInner" then
             addCorner(obj, 100)
             pcall(function() obj.BorderSizePixel = 0 end)
-            pcall(function() obj.BackgroundColor3 = Library.MainColor end)
+            pcall(function() obj.BackgroundTransparency = (name:match("Outer") and 0 or 1) end) -- Solo el outer tiene color
+            pcall(function() obj.BackgroundColor3 = Library.BackgroundColor end)
+            
+            if name:match("Outer") and not obj:FindFirstChild("MobileOuterStroke") then
+                local gs = Instance.new("UIStroke")
+                gs.Name = "MobileOuterStroke"
+                gs.Color = Library.AccentColor
+                gs.Thickness = 1.2
+                gs.Transparency = 0.3
+                gs.Parent = obj
+            end
         end
 
         if obj:IsA("TextButton") then
             local txt = obj.Text
-            if txt == "Toggle UI" or txt == "Lock UI" or txt == "Unlock UI" or txt == "Hide" or txt == "Show" then
-                if txt == "Toggle UI" then
-                    obj.Text = Library.Toggled and "Hide" or "Show"
+            if txt == "Toggle UI" or txt == "Lock UI" or txt == "Unlock UI" or txt == "Hide UI" or txt == "Show UI" or txt == "Hide" or txt == "Show" then
+                if txt == "Toggle UI" or txt == "Hide" or txt == "Show" then
+                    obj.Text = Library.Toggled and "Hide UI" or "Show UI"
                     obj.MouseButton1Down:Connect(function()
                         task.wait(0.05)
-                        obj.Text = Library.Toggled and "Hide" or "Show"
+                        obj.Text = Library.Toggled and "Hide UI" or "Show UI"
                     end)
                 end
                 
                 addCorner(obj, 100)
                 obj.BorderSizePixel = 0
+                obj.BackgroundTransparency = 1 -- El color lo da el Outer
                 
-                -- Borde luminoso exterior permanente en movil
-                if not obj:FindFirstChild("MobileGlow") then
-                    local g = Instance.new("UIStroke")
-                    g.Name = "MobileGlow"
-                    g.Color = Library.AccentColor
-                    g.Thickness = 1.5
-                    g.Transparency = 0.2
-                    g.Parent = obj
+                -- Quitar el resalto feo de las letras
+                pcall(function() obj.TextStrokeTransparency = 1 end)
+                
+                -- Hover glow applies to the outer frame, not the button itself
+                if obj.Parent and obj.Parent.Parent and obj.Parent.Parent.Parent then
+                    applyProHover(obj.Parent.Parent.Parent)
                 end
-                
-                applyProHover(obj)
             end
         end
 
         if not obj:IsA("Frame") then return end
 
-        -- 1. WINDOW (Exterior Premium más grueso)
+        -- 1. WINDOW (Exterior Premium muy fino)
         if name == "Window" then
             addCorner(obj, Config.WindowRadius)
             obj.BorderSizePixel = 0
@@ -113,8 +120,8 @@ local function ApplyMounxStyle(Library)
                 local glow = Instance.new("UIStroke")
                 glow.Name = "WindowGlow"
                 glow.Color = Library.AccentColor or Color3.fromRGB(179, 102, 255)
-                glow.Thickness = 2.5 -- Más grueso como pediste
-                glow.Transparency = 0.1 -- Más brillante
+                glow.Thickness = 1.2 -- Fino y elegante
+                glow.Transparency = 0.3
                 glow.Parent = obj
             end
             
@@ -138,14 +145,14 @@ local function ApplyMounxStyle(Library)
             return
         end
 
-        -- WATERMARK Y KEYBINDS (Redondeados perfectos)
+        -- WATERMARK Y KEYBINDS (Pill-shaped / Modern Look)
         if name == "Watermark" or name == "Keybinds" then
-            addCorner(obj, Config.GroupRadius)
+            addCorner(obj, 12)
             obj.BorderSizePixel = 0
             
             for _, inner in ipairs(obj:GetChildren()) do
                 if inner:IsA("Frame") or inner:IsA("TextLabel") then
-                    addCorner(inner, Config.GroupRadius)
+                    addCorner(inner, 12)
                     pcall(function() inner.BorderSizePixel = 0 end)
                 end
             end
@@ -154,7 +161,7 @@ local function ApplyMounxStyle(Library)
                 local glow = Instance.new("UIStroke")
                 glow.Name = "WidgetGlow"
                 glow.Color = Library.AccentColor
-                glow.Thickness = 1.5
+                glow.Thickness = 1.2
                 glow.Transparency = 0.2
                 glow.Parent = obj
             end
@@ -166,6 +173,7 @@ local function ApplyMounxStyle(Library)
             obj.BorderSizePixel = 0
         end
 
+        -- HIGHLIGHT (Top line difuminada)
         if obj.Size == UDim2.new(1, 0, 0, 2) and obj.Parent and obj.Parent.Name == "BoxInner" then
             if not obj:FindFirstChild("FadeGrad") then
                 local g = Instance.new("UIGradient")
@@ -176,10 +184,20 @@ local function ApplyMounxStyle(Library)
             end
         end
 
-        -- CHECKBOXES
+        -- CHECKBOXES (Circulares con anillo exterior fino)
         if obj.Size == UDim2.new(0, 13, 0, 13) then
             addCorner(obj, 100)
             obj.BorderSizePixel = 0
+            
+            if not obj:FindFirstChild("CheckRing") then
+                local ring = Instance.new("UIStroke")
+                ring.Name = "CheckRing"
+                ring.Color = Color3.new(0.3, 0.3, 0.3) -- Anillo muy tenue
+                ring.Thickness = 1
+                ring.Transparency = 0.5
+                ring.Parent = obj
+            end
+            
             for _, inner in ipairs(obj:GetChildren()) do
                 if inner:IsA("Frame") then
                     addCorner(inner, 100)
@@ -245,12 +263,12 @@ local function ApplyMounxStyle(Library)
 end
 
 function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
-    local MenuGroup = SettingsTab:AddLeftGroupbox('Menu & Cerrar')
+    local MenuGroup = SettingsTab:AddLeftGroupbox('Menu & Close')
     MenuGroup:AddButton('Unload Script', function() Library:Unload() end)
     MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'RightControl', NoUI = true, Text = 'Menu keybind' })
     Library.ToggleKeybind = Library.Options.MenuKeybind
     
-    local ExtrasGroup = SettingsTab:AddRightGroupbox('Extras & UI')
+    local ExtrasGroup = SettingsTab:AddRightGroupbox('Menu Extras')
     ExtrasGroup:AddToggle('WatermarkToggle', {
         Text = 'Show Watermark', Default = false,
         Callback = function(v) Library:SetWatermarkVisibility(v) end
@@ -284,7 +302,6 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     task.spawn(function()
         task.wait(0.2)
         ApplyMounxStyle(Library)
-        -- Hacer visible el menu YA estilizado
         pcall(function() Library.ScreenGui.Enabled = true end)
     end)
 end
