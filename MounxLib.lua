@@ -3,11 +3,10 @@ local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
--- Ocultar Inmediatamente
 pcall(function() if Library.ScreenGui then Library.ScreenGui.Enabled = false end end)
 
 -- ==================================================
--- MOUNX CUSTOM THEMES (V11)
+-- MOUNX CUSTOM THEMES (V12)
 -- ==================================================
 ThemeManager.BuiltInThemes['Default'] = nil
 ThemeManager.BuiltInThemes['Mounx Default'] = { 1, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"141419","AccentColor":"a855f7","BackgroundColor":"0a0a0f","OutlineColor":"0a0a0f"}') }
@@ -17,19 +16,19 @@ MounxHub.Library = Library
 MounxHub.ThemeManager = ThemeManager
 MounxHub.SaveManager = SaveManager
 
+-- Deteccion de Movil
+local UIS = game:GetService("UserInputService")
+local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
+
 --// ============================================================
---// MOUNX STYLE ENGINE (PREMIUM V11)
+--// MOUNX STYLE ENGINE (PREMIUM V12)
 --// ============================================================
 local function ApplyMounxStyle(Library)
     if not Library or not Library.ScreenGui then return end
     local gui = Library.ScreenGui
     local TweenService = game:GetService("TweenService")
     
-    local Config = {
-        WindowRadius = 14,
-        GroupRadius = 8,
-        ControlRadius = 6,
-    }
+    local Config = { WindowRadius = 14, GroupRadius = 8, ControlRadius = 6 }
 
     local function addCorner(obj, rad)
         if not obj or not obj:IsA("GuiObject") then return end
@@ -60,42 +59,39 @@ local function ApplyMounxStyle(Library)
         obj.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then tOut:Play() end end)
     end
 
-    -- NUEVO HOVER EXCLUSIVO PARA CHECKBOXES (Glow interno elegante)
-    local function applyCheckboxGlow(obj)
-        if not obj or obj:FindFirstChild("CheckGlow") then return end
+    local function applyCheckboxGlow(circleObj)
+        if not circleObj or circleObj:FindFirstChild("CheckGlow") then return end
         local glow = Instance.new("Frame")
         glow.Name = "CheckGlow"
         glow.Size = UDim2.new(1, 0, 1, 0)
-        glow.BackgroundColor3 = Color3.new(1, 1, 1) -- Blanco puro
-        glow.BackgroundTransparency = 1 -- Invisible por defecto
+        glow.BackgroundColor3 = Color3.new(1, 1, 1)
+        glow.BackgroundTransparency = 1
         glow.BorderSizePixel = 0
-        glow.ZIndex = obj.ZIndex + 2
-        glow.Parent = obj
+        glow.ZIndex = circleObj.ZIndex + 2
+        glow.Parent = circleObj
         
         local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(1, 0) -- 100% circular
+        c.CornerRadius = UDim.new(1, 0)
         c.Parent = glow
         
         local tIn = TweenService:Create(glow, TweenInfo.new(0.15), {BackgroundTransparency = 0.85})
         local tOut = TweenService:Create(glow, TweenInfo.new(0.35), {BackgroundTransparency = 1})
 
-        obj.MouseEnter:Connect(function() tIn:Play() end)
-        obj.MouseLeave:Connect(function() tOut:Play() end)
-        obj.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then tIn:Play() end end)
-        obj.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then tOut:Play() end end)
+        local parentRow = circleObj.Parent
+        if parentRow and parentRow:IsA("TextLabel") then
+            parentRow.MouseEnter:Connect(function() tIn:Play() end)
+            parentRow.MouseLeave:Connect(function() tOut:Play() end)
+            parentRow.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then tIn:Play() end end)
+            parentRow.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then tOut:Play() end end)
+        end
     end
 
     if Library.WatermarkOuter then
         addCorner(Library.WatermarkOuter, 100)
         pcall(function() Library.WatermarkOuter.BorderSizePixel = 0 end)
-        
         for _, inner in ipairs(Library.WatermarkOuter:GetDescendants()) do
-            if inner:IsA("GuiObject") then
-                addCorner(inner, 100)
-                pcall(function() inner.BorderSizePixel = 0 end)
-            end
+            if inner:IsA("GuiObject") then addCorner(inner, 100); pcall(function() inner.BorderSizePixel = 0 end) end
         end
-
         if not Library.WatermarkOuter:FindFirstChild("WidgetGlow") then
             local glow = Instance.new("UIStroke")
             glow.Name = "WidgetGlow"
@@ -103,6 +99,22 @@ local function ApplyMounxStyle(Library)
             glow.Thickness = 1.5
             glow.Transparency = 0.2
             glow.Parent = Library.WatermarkOuter
+        end
+    end
+    
+    if Library.KeybindFrame then
+        addCorner(Library.KeybindFrame, 10)
+        pcall(function() Library.KeybindFrame.BorderSizePixel = 0 end)
+        for _, inner in ipairs(Library.KeybindFrame:GetDescendants()) do
+            if inner:IsA("GuiObject") then addCorner(inner, 10); pcall(function() inner.BorderSizePixel = 0 end) end
+        end
+        if not Library.KeybindFrame:FindFirstChild("WidgetGlow") then
+            local glow = Instance.new("UIStroke")
+            glow.Name = "WidgetGlow"
+            glow.Color = Library.AccentColor
+            glow.Thickness = 1.5
+            glow.Transparency = 0.2
+            glow.Parent = Library.KeybindFrame
         end
     end
 
@@ -129,22 +141,24 @@ local function ApplyMounxStyle(Library)
                     end
                 end
 
-                obj.Size = UDim2.new(0, 90, 0, 30)
+                obj.Size = UDim2.new(1, 0, 1, 0) 
+                if obj.Parent then obj.Parent.Size = UDim2.new(0, 100, 0, 26) end
+                
                 addCorner(obj, 100)
                 obj.BorderSizePixel = 0
-                obj.BackgroundColor3 = Library.AccentColor
+                obj.BackgroundColor3 = Library.MainColor
                 obj.BackgroundTransparency = 0
-                obj.TextColor3 = Color3.new(1, 1, 1)
-                obj.Font = Enum.Font.GothamBold
+                obj.TextColor3 = Color3.new(1,1,1)
+                obj.Font = Enum.Font.GothamMedium
                 pcall(function() obj.TextStrokeTransparency = 1 end)
                 
-                if not obj:FindFirstChild("MobileGlow") then
-                    local mg = Instance.new("UIStroke")
-                    mg.Name = "MobileGlow"
-                    mg.Color = Color3.new(1,1,1)
-                    mg.Thickness = 1
-                    mg.Transparency = 0.5
-                    mg.Parent = obj
+                if not obj:FindFirstChild("MobileOutline") then
+                    local stroke = Instance.new("UIStroke")
+                    stroke.Name = "MobileOutline"
+                    stroke.Color = Library.AccentColor
+                    stroke.Thickness = 1.5
+                    stroke.Transparency = 0
+                    stroke.Parent = obj
                 end
             end
         end
@@ -155,7 +169,6 @@ local function ApplyMounxStyle(Library)
         if name == "Window" then
             addCorner(obj, Config.WindowRadius)
             obj.BorderSizePixel = 0
-            
             if not obj:FindFirstChild("WindowGlow") then
                 local glow = Instance.new("UIStroke")
                 glow.Name = "WindowGlow"
@@ -164,7 +177,6 @@ local function ApplyMounxStyle(Library)
                 glow.Transparency = 0.3
                 glow.Parent = obj
             end
-            
             for _, child in ipairs(obj:GetChildren()) do
                 if child:IsA("Frame") and child.Name ~= "WindowGlow" then
                     addCorner(child, Config.WindowRadius - 1)
@@ -198,11 +210,9 @@ local function ApplyMounxStyle(Library)
             end
         end
 
-        -- CHECKBOXES (Hover de destello blanco super limpio)
         if obj.Size == UDim2.new(0, 13, 0, 13) then
             addCorner(obj, 100)
             obj.BorderSizePixel = 0
-            
             if not obj:FindFirstChild("CheckRing") then
                 local ring = Instance.new("UIStroke")
                 ring.Name = "CheckRing"
@@ -211,25 +221,19 @@ local function ApplyMounxStyle(Library)
                 ring.Transparency = 0.5
                 ring.Parent = obj
             end
-            
             for _, inner in ipairs(obj:GetChildren()) do
                 if inner:IsA("Frame") and inner.Name ~= "CheckRing" and inner.Name ~= "CheckGlow" then
                     addCorner(inner, 100)
                     inner.BorderSizePixel = 0
                 end
             end
-            
-            -- Limpiar hover viejos que rompian la fila entera
             if obj.Parent then
                 local oldHover = obj.Parent:FindFirstChild("ProHover")
                 if oldHover then oldHover:Destroy() end
             end
-            
-            -- Aplicar nuevo hover exclusivo al circulito
             applyCheckboxGlow(obj)
         end
 
-        -- SLIDERS
         if obj.Size == UDim2.new(1, -4, 0, 13) then
             addCorner(obj, Config.ControlRadius)
             obj.BorderSizePixel = 0
@@ -251,7 +255,6 @@ local function ApplyMounxStyle(Library)
             applyProHover(obj)
         end
 
-        -- BOTONES / DROPDOWNS
         if obj.Size == UDim2.new(1, -4, 0, 20) or obj.Size == UDim2.new(1, -4, 0, 22) or obj.Size == UDim2.new(1, 0, 0, 20) then
             addCorner(obj, Config.ControlRadius)
             obj.BorderSizePixel = 0
@@ -261,14 +264,12 @@ local function ApplyMounxStyle(Library)
             applyProHover(obj)
         end
         
-        -- COLORPICKERS
         if obj.Size == UDim2.new(0, 14, 0, 14) or obj.Size == UDim2.new(0, 20, 0, 14) then
             addCorner(obj, 4)
             obj.BorderSizePixel = 0
             applyProHover(obj)
         end
 
-        -- BOTONES TABS
         if obj:IsA("TextButton") and obj.Parent and obj.Parent.Name == "TabboxButtons" then
             addCorner(obj, 6)
             obj.BorderSizePixel = 0
@@ -292,6 +293,15 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         Callback = function(v) Library:SetWatermarkVisibility(v) end
     })
     
+    if not isMobile then
+        ExtrasGroup:AddToggle('KeybindsToggle', {
+            Text = 'Show Keybinds', Default = false,
+            Callback = function(v) Library.KeybindFrame.Visible = v end
+        })
+    else
+        pcall(function() if Library.KeybindFrame then Library.KeybindFrame.Visible = false end end)
+    end
+    
     ThemeManager:SetLibrary(Library)
     SaveManager:SetLibrary(Library)
     ThemeManager:SetFolder('MounxHub')
@@ -304,19 +314,15 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         ThemeManager:ApplyTheme('Mounx Default')
     end
     
-    pcall(function() if Library.KeybindFrame then Library.KeybindFrame:Destroy() end end)
-    pcall(function() if Library.Options.VideoLink then Library.Options.VideoLink:SetVisible(false) end end)
-    
-    -- Apagar watermark ANTES de que el juego llame al Marketplace
     Library:SetWatermarkVisibility(false)
     if Library.WatermarkOuter then Library.WatermarkOuter.Visible = false end
+    pcall(function() if Library.Options.VideoLink then Library.Options.VideoLink:SetVisible(false) end end)
     
     task.spawn(function()
         local ok, info = pcall(function() return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId) end)
         local gName = (ok and info) and info.Name or "Game"
         local pName = game.Players.LocalPlayer and game.Players.LocalPlayer.Name or "User"
         
-        -- Al cambiar el texto, Linoria lo prende. Asi que lo apagamos de inmediato en la misma linea.
         Library:SetWatermark(gName .. " | " .. pName .. " | Mounx")
         Library:SetWatermarkVisibility(wmToggle.Value)
     end)
