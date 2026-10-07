@@ -104,16 +104,33 @@ local function ApplyMounxStyle(Library)
     end
 
     if Library.WatermarkOuter then styleWidget(Library.WatermarkOuter) end
-        if Library.KeybindFrame then 
+            if Library.KeybindFrame then 
         styleWidget(Library.KeybindFrame) 
-        Library.KeybindFrame.BackgroundTransparency = 0.05
+        Library.KeybindFrame.BackgroundTransparency = 0.1
+        Library.KeybindFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        
+        local title = Library.KeybindFrame:FindFirstChildWhichIsA("TextLabel")
+        if title then
+            title.Font = Enum.Font.GothamBold
+            title.TextColor3 = Color3.fromRGB(255, 255, 255)
+            if not title:FindFirstChild("TitleDivider") then
+                local div = Instance.new("Frame")
+                div.Name = "TitleDivider"
+                div.BackgroundColor3 = Library.AccentColor
+                div.BorderSizePixel = 0
+                div.Size = UDim2.new(1, -10, 0, 2)
+                div.Position = UDim2.new(0, 5, 1, 3)
+                div.Parent = title
+            end
+        end
+        
         if not Library.KeybindFrame:FindFirstChild("ProGradient") then
             local grad = Instance.new("UIGradient")
             grad.Name = "ProGradient"
             grad.Rotation = 45
             grad.Color = ColorSequence.new({
                 ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-                ColorSequenceKeypoint.new(1, Color3.new(0.65, 0.65, 0.65))
+                ColorSequenceKeypoint.new(1, Color3.new(0.5, 0.5, 0.5))
             })
             grad.Parent = Library.KeybindFrame
         end
@@ -147,15 +164,11 @@ local function ApplyMounxStyle(Library)
                 obj.Size = UDim2.new(0, 90, 0, 28)
                 
                 -- Agregamos un UIListLayout al parent para que no se traslapen automaticamente!
-                                if obj.Parent and obj.Parent:IsA("Frame") and not obj.Parent:FindFirstChild("MounxList") then
-                    local list = Instance.new("UIListLayout")
-                    list.Name = "MounxList"
-                    list.Padding = UDim.new(0, 8)
-                    list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-                    list.Parent = obj.Parent
-                    
-                    if Library.IsMobile then
-                        obj.Parent.Position = UDim2.new(0.5, 0, 0, 50)
+                                                                if Library.IsMobile and obj.Parent and obj.Parent:IsA("Frame") then
+                    if txt == "Lock UI" or txt == "Unlock UI" then
+                        obj.Parent.Position = UDim2.new(0.5, 0, 0, 60)
+                    else
+                        obj.Parent.Position = UDim2.new(0.5, 0, 0, 20)
                     end
                 end
                 
@@ -337,18 +350,32 @@ local function ApplyMounxStyle(Library)
     gui.DescendantAdded:Connect(function(child) task.wait() styleObj(child) end)
     
     pcall(function() Library:UpdateColorsUsingRegistry() end)
-    local oldNotify = Library.Notify
+            local oldNotify = Library.Notify
     function Library:Notify(text, time)
         local result = oldNotify(self, text, time)
-        if Library.IsMobile and Library.ScreenGui then
-            for _, v in ipairs(Library.ScreenGui:GetChildren()) do
-                local list = v:FindFirstChildWhichIsA("UIListLayout")
-                if list and v.Name:lower():match("notif") then
-                    v.Position = UDim2.new(1, -15, 0, 15)
-                    v.AnchorPoint = Vector2.new(1, 0)
-                    list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+        if Library.IsMobile then
+            task.spawn(function()
+                task.wait(0.05)
+                local guis = {}
+                pcall(function() for _, g in ipairs(game:GetService("CoreGui"):GetChildren()) do table.insert(guis, g) end end)
+                pcall(function() if game.Players.LocalPlayer then for _, g in ipairs(game.Players.LocalPlayer:WaitForChild("PlayerGui"):GetChildren()) do table.insert(guis, g) end end end)
+                
+                for _, gui in ipairs(guis) do
+                    if gui:IsA("ScreenGui") then
+                        for _, v in ipairs(gui:GetChildren()) do
+                            if v:IsA("Frame") and v.BackgroundTransparency == 1 then
+                                local list = v:FindFirstChildWhichIsA("UIListLayout")
+                                if list and (list.VerticalAlignment == Enum.VerticalAlignment.Bottom or list.VerticalAlignment == Enum.VerticalAlignment.Top) then
+                                    v.Position = UDim2.new(1, -15, 0, 15)
+                                    v.AnchorPoint = Vector2.new(1, 0)
+                                    list.VerticalAlignment = Enum.VerticalAlignment.Top
+                                    list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+                                end
+                            end
+                        end
+                    end
                 end
-            end
+            end)
         end
         return result
     end
@@ -401,7 +428,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         local lastTime = tick()
         local fps = 60
         
-        RS.RenderStepped:Connect(function()
+                RS.RenderStepped:Connect(function()
             frames = frames + 1
             if tick() - lastTime >= 1 then
                 fps = frames
@@ -409,7 +436,9 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 lastTime = tick()
             end
             if Library and not Library.Unloaded then
-                Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, fps))
+                if Library.WatermarkOuter and Library.WatermarkOuter.Visible then
+                    Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, fps))
+                end
             end
         end)
         
@@ -425,4 +454,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
+
+
 
