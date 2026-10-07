@@ -361,7 +361,63 @@ local function ApplyMounxStyle(Library)
         end
     end
 
-    for _, child in ipairs(gui:GetDescendants()) do styleObj(child) end
+        for _, child in ipairs(gui:GetDescendants()) do 
+        styleObj(child) 
+        
+        local v = child
+        if v:IsA("ScrollingFrame") and v.Name == "Frame" and v.CanvasSize == UDim2.new(0, 0, 2, 0) then
+            -- This is the TabArea
+            local function setupTabs()
+                local activeLine = Instance.new("Frame")
+                activeLine.Name = "ActiveTabLine"
+                activeLine.Size = UDim2.new(0, 0, 0, 2)
+                activeLine.Position = UDim2.new(0, 0, 1, -2)
+                activeLine.BackgroundColor3 = Library.AccentColor
+                activeLine.BorderSizePixel = 0
+                activeLine.ZIndex = 5
+                activeLine.Parent = v
+                Instance.new("UICorner", activeLine).CornerRadius = UDim.new(1, 0)
+                
+                local glow = Instance.new("UIStroke")
+                glow.Transparency = 0.5
+                glow.Color = Library.AccentColor
+                glow.Thickness = 2
+                glow.Parent = activeLine
+
+                Library:AddToRegistry(activeLine, { BackgroundColor3 = "AccentColor" })
+                Library:AddToRegistry(glow, { Color = "AccentColor" })
+
+                local function updateTabs()
+                    for _, btn in ipairs(v:GetChildren()) do
+                        if btn:IsA("Frame") and btn.Name == "Frame" then
+                            local isBlockerVisible = false
+                            for _, child in ipairs(btn:GetChildren()) do
+                                if child:IsA("Frame") and child.Size == UDim2.new(1, 0, 0, 1) and child.BackgroundTransparency == 0 then
+                                    isBlockerVisible = true
+                                end
+                            end
+                            
+                            if isBlockerVisible or btn.BackgroundColor3 == Library.MainColor then
+                                game:GetService("TweenService"):Create(activeLine, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                                    Size = UDim2.new(0, btn.Size.X.Offset - 10, 0, 2),
+                                    Position = UDim2.new(0, btn.Position.X.Offset + 5, 1, -2)
+                                }):Play()
+                            end
+                            
+                            if not btn:GetAttribute("Hooked") then
+                                btn:SetAttribute("Hooked", true)
+                                btn:GetPropertyChangedSignal("BackgroundColor3"):Connect(updateTabs)
+                            end
+                        end
+                    end
+                end
+                
+                v.ChildAdded:Connect(updateTabs)
+                task.delay(0.1, updateTabs)
+            end
+            setupTabs()
+        end
+    end
     gui.DescendantAdded:Connect(function(child) task.wait() styleObj(child) end)
     
     pcall(function() Library:UpdateColorsUsingRegistry() end)
@@ -438,32 +494,12 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 local gName = (ok and info) and info.Name or "Game"
         local pName = game.Players.LocalPlayer and game.Players.LocalPlayer.DisplayName or "User"
         
-        if Library and not Library.Unloaded then
-            Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, 0))
-            Library:SetWatermarkVisibility(false)
-            if Library.WatermarkOuter then Library.WatermarkOuter.Visible = false end
+                if Library and not Library.Unloaded then
+            local text = "Mounx | " .. tostring(gName) .. " | " .. tostring(pName)
+            pcall(function() Library:SetWatermark(text) end)
+            pcall(function() Library:SetWatermarkVisibility(wmToggle.Value) end)
+            pcall(function() if Library.WatermarkOuter then Library.WatermarkOuter.Visible = wmToggle.Value end end)
         end
-        
-        local RS = game:GetService("RunService")
-        local frames = 0
-        local lastTime = tick()
-        local fps = 60
-        
-                RS.RenderStepped:Connect(function()
-            frames = frames + 1
-            if tick() - lastTime >= 1 then
-                fps = frames
-                frames = 0
-                lastTime = tick()
-            end
-                                    if Library and not Library.Unloaded then
-                if Library.WatermarkOuter and Library.WatermarkOuter.Visible then
-                    Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, fps))
-                end
-            end
-        end)
-        
-        Library:SetWatermarkVisibility(wmToggle.Value)
     end)
     
     task.spawn(function()
