@@ -3,6 +3,7 @@ local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
+-- Evitar Flash
 pcall(function() if Library.ScreenGui then Library.ScreenGui.Enabled = false end end)
 
 ThemeManager.BuiltInThemes['Default'] = nil
@@ -16,6 +17,9 @@ MounxHub.SaveManager = SaveManager
 local UIS = game:GetService("UserInputService")
 local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
 
+--// ============================================================
+--// MOUNX STYLE ENGINE (PREMIUM V14)
+--// ============================================================
 local function ApplyMounxStyle(Library)
     if not Library or not Library.ScreenGui then return end
     local gui = Library.ScreenGui
@@ -33,38 +37,21 @@ local function ApplyMounxStyle(Library)
         end
     end
 
-    local function addShadow(obj, size, trans)
-        if not obj or obj:FindFirstChild("MounxShadow") then return end
-        local shadow = Instance.new("ImageLabel")
-        shadow.Name = "MounxShadow"
-        shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-        shadow.Position = UDim2.fromScale(0.5, 0.5)
-        shadow.Size = UDim2.new(1, size or 60, 1, size or 60)
-        shadow.BackgroundTransparency = 1
-        shadow.Image = "rbxassetid://6014261993"
-        shadow.ImageColor3 = Color3.new(0, 0, 0)
-        shadow.ImageTransparency = trans or 0.35
-        shadow.ZIndex = obj.ZIndex - 1
-        shadow.Parent = obj
-    end
-
-    -- HOVER DINAMICO: Se registra en Linoria para que cambie de color con el tema
     local function applyProHover(obj, customStroke)
         if not obj or obj:FindFirstChild("ProHover") then return end
         local stroke = customStroke or Instance.new("UIStroke")
         stroke.Name = "ProHover"
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.Color = Library.AccentColor or Color3.fromRGB(179, 102, 255)
         stroke.Thickness = 1.2
         stroke.Transparency = 1
         stroke.Parent = obj
         
-        -- ¡Magia Dinamica!
         Library:AddToRegistry(stroke, { Color = "AccentColor" })
         
-        local tIn = TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0})
-        local tOut = TweenService:Create(stroke, TweenInfo.new(0.35), {Transparency = 1})
+        local tIn = TweenService:Create(stroke, TweenInfo.new(0.12), {Transparency = 0})
+        local tOut = TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 1})
 
-        -- Conectamos el hover al padre (TextLabel entero) si es checkbox
         local trigger = obj
         if obj.Size == UDim2.new(0, 13, 0, 13) and obj.Parent then trigger = obj.Parent end
         
@@ -74,14 +61,12 @@ local function ApplyMounxStyle(Library)
         trigger.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then tOut:Play() end end)
     end
 
-    -- ESTILIZAR WIDGETS (Watermark y Keybinds)
     local function styleWidget(widget)
         if not widget then return end
         addCorner(widget, 100)
         pcall(function() widget.BorderSizePixel = 0 end)
         for _, inner in ipairs(widget:GetDescendants()) do
             if inner:IsA("GuiObject") then addCorner(inner, 100); pcall(function() inner.BorderSizePixel = 0 end) end
-            -- MATAR la linea fea (Highlight)
             if inner:IsA("Frame") and inner.Size.Y.Offset <= 2 and inner.BorderSizePixel == 0 and inner.BackgroundColor3 == Library.AccentColor then
                 inner.Visible = false
                 inner:Destroy()
@@ -90,6 +75,7 @@ local function ApplyMounxStyle(Library)
         if not widget:FindFirstChild("WidgetGlow") then
             local glow = Instance.new("UIStroke")
             glow.Name = "WidgetGlow"
+            glow.Color = Library.AccentColor
             glow.Thickness = 1.5
             glow.Transparency = 0.2
             glow.Parent = widget
@@ -103,7 +89,7 @@ local function ApplyMounxStyle(Library)
     local function styleObj(obj)
         if not obj then return end
 
-        -- BOTONES MOVIL PROFESIONALES (Shadow, Centrados, Outline Dinamico)
+        -- BOTONES MOVIL PROFESIONALES (Sin sombras cuadradas, arrastrables y limpios)
         if obj:IsA("TextButton") then
             local txt = obj.Text
             if txt == "Toggle UI" or txt == "Lock UI" or txt == "Unlock UI" or txt == "Hide UI" or txt == "Show UI" or txt == "Hide" or txt == "Show" then
@@ -115,6 +101,7 @@ local function ApplyMounxStyle(Library)
                     end)
                 end
                 
+                -- Limpiar padres oscuros
                 local p = obj.Parent
                 for i = 1, 3 do
                     if p and p:IsA("Frame") then
@@ -124,39 +111,35 @@ local function ApplyMounxStyle(Library)
                     end
                 end
 
-                obj.Size = UDim2.new(0, 100, 0, 32)
-                obj.AnchorPoint = Vector2.new(0.5, 0.5)
-                
-                if obj.Parent then
-                    obj.Position = UDim2.new(0.5, 0, 0.5, 0)
-                end
+                -- Restaurar tamaño y dejar que el dragger de Linoria lo posicione
+                obj.Size = UDim2.new(1, 0, 1, 0) 
+                if obj.Parent then obj.Parent.Size = UDim2.new(0, 90, 0, 28) end
                 
                 addCorner(obj, 100)
                 obj.BorderSizePixel = 0
+                obj.BackgroundColor3 = Library.BackgroundColor
                 obj.BackgroundTransparency = 0
                 obj.TextColor3 = Color3.new(1, 1, 1)
                 obj.Font = Enum.Font.GothamBold
                 
-                Library:AddToRegistry(obj, { BackgroundColor3 = "MainColor" })
+                Library:AddToRegistry(obj, { BackgroundColor3 = "BackgroundColor" })
                 pcall(function() obj.TextStrokeTransparency = 1 end)
                 
                 if not obj:FindFirstChild("MobileOutline") then
                     local stroke = Instance.new("UIStroke")
                     stroke.Name = "MobileOutline"
+                    stroke.Color = Library.AccentColor
                     stroke.Thickness = 1.5
                     stroke.Transparency = 0
                     stroke.Parent = obj
                     Library:AddToRegistry(stroke, { Color = "AccentColor" })
                 end
-                
-                addShadow(obj, 50, 0.5)
             end
         end
 
         if not obj:IsA("Frame") then return end
         local name = obj.Name
 
-        -- ELIMINAR LINEAS FEAS (Highlight de los menus y cajas)
         if obj.Size.Y.Offset <= 2 and obj.BorderSizePixel == 0 and obj.Parent and (obj.Parent.Name == "BoxInner" or obj.Parent.Name == "MainSectionInner" or obj.Parent.Name == "TabContainer") then
             obj.Visible = false
             obj:Destroy()
@@ -169,6 +152,7 @@ local function ApplyMounxStyle(Library)
             if not obj:FindFirstChild("WindowGlow") then
                 local glow = Instance.new("UIStroke")
                 glow.Name = "WindowGlow"
+                glow.Color = Library.AccentColor or Color3.fromRGB(179, 102, 255)
                 glow.Thickness = 1.2
                 glow.Transparency = 0.3
                 glow.Parent = obj
@@ -197,7 +181,6 @@ local function ApplyMounxStyle(Library)
             obj.BorderSizePixel = 0
         end
 
-        -- CHECKBOXES (Hover fuerte que reacciona a toda la fila)
         if obj.Size == UDim2.new(0, 13, 0, 13) then
             addCorner(obj, 100)
             obj.BorderSizePixel = 0
@@ -213,7 +196,7 @@ local function ApplyMounxStyle(Library)
             end
             
             for _, inner in ipairs(obj:GetChildren()) do
-                if inner:IsA("Frame") and inner.Name ~= "CheckRing" and inner.Name ~= "CheckGlow" then
+                if inner:IsA("Frame") and inner.Name ~= "CheckRing" then
                     addCorner(inner, 100)
                     inner.BorderSizePixel = 0
                 end
@@ -224,7 +207,6 @@ local function ApplyMounxStyle(Library)
                 if oldHover then oldHover:Destroy() end
             end
             
-            -- Aplicamos Hover Dinamico: El anillo reacciona al color del tema!
             applyProHover(obj)
         end
 
@@ -270,10 +252,9 @@ local function ApplyMounxStyle(Library)
             applyProHover(obj)
         end
 
-        -- SOLUCION AL SCROLL EN MOVIL (Agrandar la barra para que arrastren de ahi y no de los botones)
         if obj:IsA("ScrollingFrame") then
             if isMobile then
-                obj.ScrollBarThickness = 18 -- Super ancha para movil
+                obj.ScrollBarThickness = 18
                 obj.ScrollBarImageTransparency = 0.4
             else
                 obj.ScrollBarThickness = 2
@@ -284,6 +265,9 @@ local function ApplyMounxStyle(Library)
 
     for _, child in ipairs(gui:GetDescendants()) do styleObj(child) end
     gui.DescendantAdded:Connect(function(child) task.wait() styleObj(child) end)
+    
+    -- FORZAR ACTUALIZACIÓN DE COLORES PARA QUE LOS EFECTOS TOMEN EL TEMA INMEDIATAMENTE
+    pcall(function() Library:UpdateColorsUsingRegistry() end)
 end
 
 function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
@@ -332,8 +316,8 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         Library:SetWatermarkVisibility(wmToggle.Value)
     end)
     
+    -- APLICAR ESTILOS SIN RETRASO PARA QUE EL HOVER RESPONDA DE INMEDIATO
     task.spawn(function()
-        task.wait(0.1)
         ApplyMounxStyle(Library)
         pcall(function() Library.ScreenGui.Enabled = true end)
     end)
