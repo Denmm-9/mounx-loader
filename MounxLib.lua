@@ -435,8 +435,14 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     
     task.spawn(function()
                 local ok, info = pcall(function() return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId) end)
-        local gName = (ok and info) and info.Name or "Game"
+                local gName = (ok and info) and info.Name or "Game"
         local pName = game.Players.LocalPlayer and game.Players.LocalPlayer.DisplayName or "User"
+        
+        if Library and not Library.Unloaded then
+            Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, 0))
+            Library:SetWatermarkVisibility(false)
+            if Library.WatermarkOuter then Library.WatermarkOuter.Visible = false end
+        end
         
         local RS = game:GetService("RunService")
         local frames = 0
@@ -450,8 +456,10 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 frames = 0
                 lastTime = tick()
             end
-                        if Library and not Library.Unloaded then
-                Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, fps))
+                                    if Library and not Library.Unloaded then
+                if Library.WatermarkOuter and Library.WatermarkOuter.Visible then
+                    Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, fps))
+                end
             end
         end)
         
@@ -467,6 +475,8 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
+
 
 
 
