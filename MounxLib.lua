@@ -499,33 +499,34 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
             Library:SetWatermarkVisibility(false)
         end
         
-        local RS = game:GetService("RunService")
+                local RS = game:GetService("RunService")
         local frames = 0
         local lastTime = tick()
         local fps = 60
         
-                RS.RenderStepped:Connect(function()
-            frames = frames + 1
-            if tick() - lastTime >= 1 then
-                fps = frames
-                frames = 0
-                lastTime = tick()
-            end
-                                                            if Library and not Library.Unloaded then
-                local text = string.format("Mounx | %s | %s | %d FPS", gName, pName, fps)
-                if Library.WatermarkText then
-                    Library.WatermarkText.Text = text
-                    if Library.Watermark then
-                        pcall(function()
-                            local X, Y = Library:GetTextBounds(text, Library.Font, 14)
+        RS.Heartbeat:Connect(function()
+            pcall(function()
+                frames = frames + 1
+                if tick() - lastTime >= 1 then
+                    fps = frames
+                    frames = 0
+                    lastTime = tick()
+                end
+                
+                if Library and not Library.Unloaded then
+                    local text = "Mounx | " .. tostring(gName) .. " | " .. tostring(pName) .. " | " .. tostring(fps) .. " FPS"
+                    if Library.WatermarkText then
+                        Library.WatermarkText.Text = text
+                        if Library.Watermark then
+                            local X, Y = Library:GetTextBounds(text, Library.Font or Enum.Font.Code, 14)
                             Library.Watermark.Size = UDim2.new(0, X + 15, 0, (Y * 1.5) + 3)
-                        end)
+                        end
                     end
                 end
-            end
+            end)
         end)
         
-        Library:SetWatermarkVisibility(wmToggle.Value)
+        pcall(function() Library:SetWatermarkVisibility(wmToggle.Value) end)
     end)
     
     task.spawn(function()
@@ -537,6 +538,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
 
 
 
