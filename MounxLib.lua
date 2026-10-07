@@ -252,8 +252,13 @@ local function ApplyMounxStyle(Library)
         if obj.Size == UDim2.new(1, -4, 0, 13) then
             addCorner(obj, Config.ControlRadius)
             obj.BorderSizePixel = 0
+            
+            local isToggleRow = false
             for _, inner in ipairs(obj:GetChildren()) do
                 if inner:IsA("Frame") then
+                    if inner.Size == UDim2.new(0, 13, 0, 13) then
+                        isToggleRow = true
+                    end
                     addCorner(inner, Config.ControlRadius)
                     inner.BorderSizePixel = 0
                     for _, fill in ipairs(inner:GetChildren()) do
@@ -267,16 +272,25 @@ local function ApplyMounxStyle(Library)
                     end
                 end
             end
-            applyProHover(obj)
+            if not isToggleRow then
+                applyProHover(obj)
+            end
         end
 
         if obj.Size == UDim2.new(1, -4, 0, 20) or obj.Size == UDim2.new(1, -4, 0, 22) or obj.Size == UDim2.new(1, 0, 0, 20) then
             addCorner(obj, Config.ControlRadius)
             obj.BorderSizePixel = 0
+            local isToggleRow = false
             for _, inner in ipairs(obj:GetChildren()) do
-                if inner:IsA("Frame") then addCorner(inner, Config.ControlRadius); inner.BorderSizePixel = 0 end
+                if inner:IsA("Frame") then
+                    if inner.Size == UDim2.new(0, 13, 0, 13) then isToggleRow = true end
+                    addCorner(inner, Config.ControlRadius)
+                    inner.BorderSizePixel = 0 
+                end
             end
-            applyProHover(obj)
+            if not isToggleRow then
+                applyProHover(obj)
+            end
         end
         
         if obj.Size == UDim2.new(0, 14, 0, 14) or obj.Size == UDim2.new(0, 20, 0, 14) then
