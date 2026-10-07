@@ -494,39 +494,11 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 local gName = (ok and info) and info.Name or "Game"
         local pName = game.Players.LocalPlayer and game.Players.LocalPlayer.DisplayName or "User"
         
-                if Library and not Library.Unloaded then
-            Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, 0))
-            Library:SetWatermarkVisibility(false)
+                        if Library and not Library.Unloaded then
+            local text = "Mounx | " .. tostring(gName) .. " | " .. tostring(pName)
+            pcall(function() Library:SetWatermark(text) end)
+            pcall(function() Library:SetWatermarkVisibility(wmToggle.Value) end)
         end
-        
-                local RS = game:GetService("RunService")
-        local frames = 0
-        local lastTime = tick()
-        local fps = 60
-        
-        RS.Heartbeat:Connect(function()
-            pcall(function()
-                frames = frames + 1
-                if tick() - lastTime >= 1 then
-                    fps = frames
-                    frames = 0
-                    lastTime = tick()
-                end
-                
-                if Library and not Library.Unloaded then
-                    local text = "Mounx | " .. tostring(gName) .. " | " .. tostring(pName) .. " | " .. tostring(fps) .. " FPS"
-                    if Library.WatermarkText then
-                        Library.WatermarkText.Text = text
-                        if Library.Watermark then
-                            local X, Y = Library:GetTextBounds(text, Library.Font or Enum.Font.Code, 14)
-                            Library.Watermark.Size = UDim2.new(0, X + 15, 0, (Y * 1.5) + 3)
-                        end
-                    end
-                end
-            end)
-        end)
-        
-        pcall(function() Library:SetWatermarkVisibility(wmToggle.Value) end)
     end)
     
     task.spawn(function()
