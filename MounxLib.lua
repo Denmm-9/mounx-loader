@@ -104,7 +104,20 @@ local function ApplyMounxStyle(Library)
     end
 
     if Library.WatermarkOuter then styleWidget(Library.WatermarkOuter) end
-    if Library.KeybindFrame then styleWidget(Library.KeybindFrame) end
+        if Library.KeybindFrame then 
+        styleWidget(Library.KeybindFrame) 
+        Library.KeybindFrame.BackgroundTransparency = 0.05
+        if not Library.KeybindFrame:FindFirstChild("ProGradient") then
+            local grad = Instance.new("UIGradient")
+            grad.Name = "ProGradient"
+            grad.Rotation = 45
+            grad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+                ColorSequenceKeypoint.new(1, Color3.new(0.65, 0.65, 0.65))
+            })
+            grad.Parent = Library.KeybindFrame
+        end
+    end
 
     local function styleObj(obj)
         if not obj then return end
@@ -134,12 +147,16 @@ local function ApplyMounxStyle(Library)
                 obj.Size = UDim2.new(0, 90, 0, 28)
                 
                 -- Agregamos un UIListLayout al parent para que no se traslapen automaticamente!
-                if obj.Parent and obj.Parent:IsA("Frame") and not obj.Parent:FindFirstChild("MounxList") then
+                                if obj.Parent and obj.Parent:IsA("Frame") and not obj.Parent:FindFirstChild("MounxList") then
                     local list = Instance.new("UIListLayout")
                     list.Name = "MounxList"
                     list.Padding = UDim.new(0, 8)
                     list.HorizontalAlignment = Enum.HorizontalAlignment.Center
                     list.Parent = obj.Parent
+                    
+                    if Library.IsMobile then
+                        obj.Parent.Position = UDim2.new(0.5, 0, 0, 50)
+                    end
                 end
                 
                 addCorner(obj, 100)
@@ -320,6 +337,21 @@ local function ApplyMounxStyle(Library)
     gui.DescendantAdded:Connect(function(child) task.wait() styleObj(child) end)
     
     pcall(function() Library:UpdateColorsUsingRegistry() end)
+    local oldNotify = Library.Notify
+    function Library:Notify(text, time)
+        local result = oldNotify(self, text, time)
+        if Library.IsMobile and Library.ScreenGui then
+            for _, v in ipairs(Library.ScreenGui:GetChildren()) do
+                local list = v:FindFirstChildWhichIsA("UIListLayout")
+                if list and v.Name:lower():match("notif") then
+                    v.Position = UDim2.new(1, -15, 0, 15)
+                    v.AnchorPoint = Vector2.new(1, 0)
+                    list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+                end
+            end
+        end
+        return result
+    end
 end
 
 function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
@@ -360,11 +392,27 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     pcall(function() if Library.Options.VideoLink then Library.Options.VideoLink:SetVisible(false) end end)
     
     task.spawn(function()
-        local ok, info = pcall(function() return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId) end)
+                local ok, info = pcall(function() return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId) end)
         local gName = (ok and info) and info.Name or "Game"
-        local pName = game.Players.LocalPlayer and game.Players.LocalPlayer.Name or "User"
+        local pName = game.Players.LocalPlayer and game.Players.LocalPlayer.DisplayName or "User"
         
-        Library:SetWatermark(gName .. " | " .. pName .. " | Mounx")
+        local RS = game:GetService("RunService")
+        local frames = 0
+        local lastTime = tick()
+        local fps = 60
+        
+        RS.RenderStepped:Connect(function()
+            frames = frames + 1
+            if tick() - lastTime >= 1 then
+                fps = frames
+                frames = 0
+                lastTime = tick()
+            end
+            if Library and not Library.Unloaded then
+                Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, fps))
+            end
+        end)
+        
         Library:SetWatermarkVisibility(wmToggle.Value)
     end)
     
@@ -377,3 +425,4 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
