@@ -3,10 +3,25 @@ local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
+-- Evitar Flash de inicio
 pcall(function() if Library.ScreenGui then Library.ScreenGui.Enabled = false end end)
 
+local HttpService = game:GetService("HttpService")
+
+-- ==================================================
+-- MOUNX CUSTOM THEMES (V16 - TODOS LOS TEMAS RESTAURADOS)
+-- ==================================================
 ThemeManager.BuiltInThemes['Default'] = nil
-ThemeManager.BuiltInThemes['Mounx Default'] = { 1, game:GetService("HttpService"):JSONDecode('{"FontColor":"ffffff","MainColor":"141419","AccentColor":"a855f7","BackgroundColor":"0a0a0f","OutlineColor":"0a0a0f"}') }
+ThemeManager.BuiltInThemes['Mounx Default'] = { 1, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"141419","AccentColor":"a855f7","BackgroundColor":"0a0a0f","OutlineColor":"0a0a0f"}') }
+ThemeManager.BuiltInThemes['Bloody Red']    = { 2, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"191414","AccentColor":"ff3333","BackgroundColor":"0f0a0a","OutlineColor":"0f0a0a"}') }
+ThemeManager.BuiltInThemes['Dark Neon']     = { 3, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"141922","AccentColor":"00f0ff","BackgroundColor":"0a0f14","OutlineColor":"0a0f14"}') }
+ThemeManager.BuiltInThemes['Cyberpunk']     = { 4, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"22141c","AccentColor":"ff00ff","BackgroundColor":"140a12","OutlineColor":"140a12"}') }
+ThemeManager.BuiltInThemes['Toxic Green']   = { 5, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"141e14","AccentColor":"39ff14","BackgroundColor":"0a120a","OutlineColor":"0a120a"}') }
+ThemeManager.BuiltInThemes['Ocean Blue']    = { 6, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"141a22","AccentColor":"0077ff","BackgroundColor":"0a0f14","OutlineColor":"0a0f14"}') }
+ThemeManager.BuiltInThemes['Golden Luxury'] = { 7, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"221d14","AccentColor":"ffb700","BackgroundColor":"14100a","OutlineColor":"14100a"}') }
+ThemeManager.BuiltInThemes['Amethyst']      = { 8, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1a1422","AccentColor":"b366ff","BackgroundColor":"100a14","OutlineColor":"100a14"}') }
+ThemeManager.BuiltInThemes['Ruby Blood']    = { 9, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"221010","AccentColor":"ff0044","BackgroundColor":"110808","OutlineColor":"110808"}') }
+ThemeManager.BuiltInThemes['Ghost White']   = { 10, HttpService:JSONDecode('{"FontColor":"000000","MainColor":"f0f0f5","AccentColor":"000000","BackgroundColor":"e0e0e5","OutlineColor":"e0e0e5"}') }
 
 local MounxHub = {}
 MounxHub.Library = Library
@@ -16,6 +31,9 @@ MounxHub.SaveManager = SaveManager
 local UIS = game:GetService("UserInputService")
 local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
 
+--// ============================================================
+--// MOUNX STYLE ENGINE (PREMIUM V16)
+--// ============================================================
 local function ApplyMounxStyle(Library)
     if not Library or not Library.ScreenGui then return end
     local gui = Library.ScreenGui
@@ -38,11 +56,9 @@ local function ApplyMounxStyle(Library)
         local stroke = customStroke or Instance.new("UIStroke")
         stroke.Name = "ProHover"
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        stroke.Color = Library.AccentColor or Color3.fromRGB(179, 102, 255)
         stroke.Thickness = 1.2
         stroke.Transparency = 1
         stroke.Parent = obj
-        
         Library:AddToRegistry(stroke, { Color = "AccentColor" })
         
         local tIn = TweenService:Create(stroke, TweenInfo.new(0.12), {Transparency = 0})
@@ -71,7 +87,6 @@ local function ApplyMounxStyle(Library)
         if not widget:FindFirstChild("WidgetGlow") then
             local glow = Instance.new("UIStroke")
             glow.Name = "WidgetGlow"
-            glow.Color = Library.AccentColor
             glow.Thickness = 1.5
             glow.Transparency = 0.2
             glow.Parent = widget
@@ -106,6 +121,16 @@ local function ApplyMounxStyle(Library)
                     end
                 end
 
+                -- ARREGLO DE SOBREPOSICIÓN: Si es "Lock UI", lo bajamos 40 pixeles para que no se cruce
+                if obj.Parent and not obj:FindFirstChild("PosFixed") then
+                    local marker = Instance.new("BoolValue", obj)
+                    marker.Name = "PosFixed"
+                    if txt == "Lock UI" or txt == "Unlock UI" then
+                        local pos = obj.Parent.Position
+                        obj.Parent.Position = UDim2.new(pos.X.Scale, pos.X.Offset, pos.Y.Scale, pos.Y.Offset + 40)
+                    end
+                end
+
                 obj.Size = UDim2.new(1, 0, 1, 0) 
                 if obj.Parent then obj.Parent.Size = UDim2.new(0, 100, 0, 32) end
                 
@@ -113,24 +138,33 @@ local function ApplyMounxStyle(Library)
                 obj.BorderSizePixel = 0
                 obj.BackgroundTransparency = 0
                 
-                -- LETRAS CENTRADAS Y BLANCAS
                 obj.Font = Enum.Font.GothamBold
                 obj.TextXAlignment = Enum.TextXAlignment.Center
                 pcall(function() obj.TextStrokeTransparency = 1 end)
                 
-                -- BLOQUEAR A LINORIA PARA QUE NO PINTE LAS LETRAS DE MORADO
                 Library:AddToRegistry(obj, { 
-                    BackgroundColor3 = "BackgroundColor",
+                    BackgroundColor3 = "MainColor",
                     TextColor3 = "FontColor" 
                 })
+                
+                -- Hacerlos mucho mas lindos: Gradient 3D cristalino
+                if not obj:FindFirstChild("ButtonGlass") then
+                    local grad = Instance.new("UIGradient")
+                    grad.Name = "ButtonGlass"
+                    grad.Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+                        ColorSequenceKeypoint.new(1, Color3.new(0.65, 0.65, 0.65))
+                    })
+                    grad.Rotation = 90
+                    grad.Parent = obj
+                end
                 
                 if not obj:FindFirstChild("MobileOutline") then
                     local stroke = Instance.new("UIStroke")
                     stroke.Name = "MobileOutline"
-                    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border -- EL BUG FUE ESTO! Ahora sera el borde y no las letras!
-                    stroke.Color = Library.AccentColor
-                    stroke.Thickness = 1.5
-                    stroke.Transparency = 0.2
+                    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    stroke.Thickness = 2 -- Mas notorio y lindo
+                    stroke.Transparency = 0.1
                     stroke.Parent = obj
                     Library:AddToRegistry(stroke, { Color = "AccentColor" })
                 end
@@ -152,7 +186,6 @@ local function ApplyMounxStyle(Library)
             if not obj:FindFirstChild("WindowGlow") then
                 local glow = Instance.new("UIStroke")
                 glow.Name = "WindowGlow"
-                glow.Color = Library.AccentColor or Color3.fromRGB(179, 102, 255)
                 glow.Thickness = 1.2
                 glow.Transparency = 0.3
                 glow.Parent = obj
