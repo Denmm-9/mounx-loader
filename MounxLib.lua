@@ -3,7 +3,6 @@ local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
--- Evitar Flash
 pcall(function() if Library.ScreenGui then Library.ScreenGui.Enabled = false end end)
 
 ThemeManager.BuiltInThemes['Default'] = nil
@@ -17,9 +16,6 @@ MounxHub.SaveManager = SaveManager
 local UIS = game:GetService("UserInputService")
 local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
 
---// ============================================================
---// MOUNX STYLE ENGINE (PREMIUM V14)
---// ============================================================
 local function ApplyMounxStyle(Library)
     if not Library or not Library.ScreenGui then return end
     local gui = Library.ScreenGui
@@ -89,7 +85,6 @@ local function ApplyMounxStyle(Library)
     local function styleObj(obj)
         if not obj then return end
 
-        -- BOTONES MOVIL PROFESIONALES (Sin sombras cuadradas, arrastrables y limpios)
         if obj:IsA("TextButton") then
             local txt = obj.Text
             if txt == "Toggle UI" or txt == "Lock UI" or txt == "Unlock UI" or txt == "Hide UI" or txt == "Show UI" or txt == "Hide" or txt == "Show" then
@@ -101,36 +96,41 @@ local function ApplyMounxStyle(Library)
                     end)
                 end
                 
-                -- Limpiar padres oscuros
                 local p = obj.Parent
                 for i = 1, 3 do
                     if p and p:IsA("Frame") then
                         p.BackgroundTransparency = 1
                         p.BorderSizePixel = 0
+                        p.ClipsDescendants = false
                         p = p.Parent
                     end
                 end
 
-                -- Restaurar tamaño y dejar que el dragger de Linoria lo posicione
                 obj.Size = UDim2.new(1, 0, 1, 0) 
-                if obj.Parent then obj.Parent.Size = UDim2.new(0, 90, 0, 28) end
+                if obj.Parent then obj.Parent.Size = UDim2.new(0, 100, 0, 32) end
                 
                 addCorner(obj, 100)
                 obj.BorderSizePixel = 0
-                obj.BackgroundColor3 = Library.BackgroundColor
                 obj.BackgroundTransparency = 0
-                obj.TextColor3 = Color3.new(1, 1, 1)
-                obj.Font = Enum.Font.GothamBold
                 
-                Library:AddToRegistry(obj, { BackgroundColor3 = "BackgroundColor" })
+                -- LETRAS CENTRADAS Y BLANCAS
+                obj.Font = Enum.Font.GothamBold
+                obj.TextXAlignment = Enum.TextXAlignment.Center
                 pcall(function() obj.TextStrokeTransparency = 1 end)
+                
+                -- BLOQUEAR A LINORIA PARA QUE NO PINTE LAS LETRAS DE MORADO
+                Library:AddToRegistry(obj, { 
+                    BackgroundColor3 = "BackgroundColor",
+                    TextColor3 = "FontColor" 
+                })
                 
                 if not obj:FindFirstChild("MobileOutline") then
                     local stroke = Instance.new("UIStroke")
                     stroke.Name = "MobileOutline"
+                    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border -- EL BUG FUE ESTO! Ahora sera el borde y no las letras!
                     stroke.Color = Library.AccentColor
                     stroke.Thickness = 1.5
-                    stroke.Transparency = 0
+                    stroke.Transparency = 0.2
                     stroke.Parent = obj
                     Library:AddToRegistry(stroke, { Color = "AccentColor" })
                 end
@@ -266,7 +266,6 @@ local function ApplyMounxStyle(Library)
     for _, child in ipairs(gui:GetDescendants()) do styleObj(child) end
     gui.DescendantAdded:Connect(function(child) task.wait() styleObj(child) end)
     
-    -- FORZAR ACTUALIZACIÓN DE COLORES PARA QUE LOS EFECTOS TOMEN EL TEMA INMEDIATAMENTE
     pcall(function() Library:UpdateColorsUsingRegistry() end)
 end
 
@@ -316,7 +315,6 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         Library:SetWatermarkVisibility(wmToggle.Value)
     end)
     
-    -- APLICAR ESTILOS SIN RETRASO PARA QUE EL HOVER RESPONDA DE INMEDIATO
     task.spawn(function()
         ApplyMounxStyle(Library)
         pcall(function() Library.ScreenGui.Enabled = true end)
