@@ -160,16 +160,31 @@ local function ApplyMounxStyle(Library)
                     end
                 end
 
-                -- NO tocamos el parent. Solo su propio tamano.
-                obj.Size = UDim2.new(0, 90, 0, 28)
-                
-                -- Agregamos un UIListLayout al parent para que no se traslapen automaticamente!
-                                                                if Library.IsMobile and obj.Parent and obj.Parent:IsA("Frame") then
+                                -- Make dragging easier on mobile
+                if Library.IsMobile and obj.Parent and obj.Parent:IsA("Frame") then
+                    obj.Parent.Size = UDim2.new(0, 90, 0, 45)
+                    obj.Size = UDim2.new(1, 0, 1, -15)
+                    obj.Position = UDim2.new(0, 0, 0, 15)
+                    
+                    if not obj.Parent:FindFirstChild("DragHandle") then
+                        local drag = Instance.new("Frame")
+                        drag.Name = "DragHandle"
+                        drag.Size = UDim2.new(0, 30, 0, 4)
+                        drag.Position = UDim2.new(0.5, -15, 0, 5)
+                        drag.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+                        drag.BackgroundTransparency = 0.5
+                        drag.BorderSizePixel = 0
+                        Instance.new("UICorner", drag).CornerRadius = UDim.new(1, 0)
+                        drag.Parent = obj.Parent
+                    end
+
                     if txt == "Lock UI" or txt == "Unlock UI" then
                         obj.Parent.Position = UDim2.new(0.5, 0, 0, 60)
                     else
                         obj.Parent.Position = UDim2.new(0.5, 0, 0, 20)
                     end
+                else
+                    obj.Size = UDim2.new(0, 90, 0, 28)
                 end
                 
                 addCorner(obj, 100)
@@ -435,10 +450,8 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 frames = 0
                 lastTime = tick()
             end
-            if Library and not Library.Unloaded then
-                if Library.WatermarkOuter and Library.WatermarkOuter.Visible then
-                    Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, fps))
-                end
+                        if Library and not Library.Unloaded then
+                Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, fps))
             end
         end)
         
@@ -454,6 +467,8 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
+
 
 
 
