@@ -28,10 +28,9 @@ local UIS = game:GetService("UserInputService")
 local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
 
 local function safeDestroy(obj)
-    pcall(function() Library:RemoveFromRegistry(obj) end)
-    pcall(function() if Library.RegistryMap then Library.RegistryMap[obj] = nil end end)
-    obj.Visible = false
-    obj:Destroy()
+    pcall(function() obj.Visible = false end)
+    pcall(function() obj.BackgroundTransparency = 1 end)
+    pcall(function() obj.Transparency = 1 end)
 end
 
 local function ApplyMounxStyle(Library)
@@ -244,7 +243,7 @@ local function ApplyMounxStyle(Library)
             
             if obj.Parent then
                 local oldHover = obj.Parent:FindFirstChild("ProHover")
-                if oldHover then oldHover:Destroy() end
+                if oldHover then safeDestroy(oldHover) end
             end
             
             applyProHover(obj)
@@ -262,7 +261,7 @@ local function ApplyMounxStyle(Library)
                             addCorner(fill, 100)
                             fill.BorderSizePixel = 0
                             for _, secretLine in ipairs(fill:GetChildren()) do
-                                if secretLine:IsA("Frame") then secretLine:Destroy() end
+                                if secretLine:IsA("Frame") then safeDestroy(secretLine) end
                             end
                         end
                     end
