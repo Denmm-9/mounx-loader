@@ -72,22 +72,37 @@ local function ApplyMounxStyle(Library)
         trigger.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then tOut:Play() end end)
     end
 
+        local function addDropShadow(widget)
+        if not widget:FindFirstChild("DropShadow") then
+            local shadow = Instance.new("ImageLabel")
+            shadow.Name = "DropShadow"
+            shadow.BackgroundTransparency = 1
+            shadow.Position = UDim2.new(0, -15, 0, -15)
+            shadow.Size = UDim2.new(1, 30, 1, 30)
+            shadow.ZIndex = -1
+            shadow.Image = "rbxassetid://5554236805"
+            shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+            shadow.ImageTransparency = 0.4
+            shadow.ScaleType = Enum.ScaleType.Slice
+            shadow.SliceCenter = Rect.new(23, 23, 277, 277)
+            shadow.Parent = widget
+        end
+    end
+
     local function styleWidget(widget)
         if not widget then return end
-        addCorner(widget, 8) -- RECTANGULO COMO LINORIA
+        addCorner(widget, 6)
         pcall(function() widget.BorderSizePixel = 0 end)
         
         for _, inner in ipairs(widget:GetDescendants()) do
             if inner:IsA("GuiObject") then 
-                -- Hacer circulares solo a los puntitos de estado!
                 if inner.Size.X.Offset <= 15 and inner.Size.X.Scale == 0 then
                     addCorner(inner, 100)
                 else
-                    addCorner(inner, 8)
+                    addCorner(inner, 6)
                 end
                 pcall(function() inner.BorderSizePixel = 0 end)
             end
-            
             if inner:IsA("Frame") and inner.Size.Y.Offset <= 2 and inner.BorderSizePixel == 0 and inner.BackgroundColor3 == Library.AccentColor then
                 safeDestroy(inner)
             end
@@ -97,17 +112,23 @@ local function ApplyMounxStyle(Library)
             local glow = Instance.new("UIStroke")
             glow.Name = "WidgetGlow"
             glow.Thickness = 1.2
-            glow.Transparency = 0.2
+            glow.Transparency = 0.1
             glow.Parent = widget
             Library:AddToRegistry(glow, { Color = "AccentColor" })
         end
+        addDropShadow(widget)
     end
 
-    if Library.WatermarkOuter then styleWidget(Library.WatermarkOuter) end
-            if Library.KeybindFrame then 
+    if Library.WatermarkOuter then 
+        styleWidget(Library.WatermarkOuter) 
+        Library.WatermarkOuter.BackgroundTransparency = 0.15
+        Library.WatermarkOuter.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+    end
+    
+    if Library.KeybindFrame then 
         styleWidget(Library.KeybindFrame) 
-        Library.KeybindFrame.BackgroundTransparency = 0.1
-        Library.KeybindFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        Library.KeybindFrame.BackgroundTransparency = 0.15
+        Library.KeybindFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
         
         local title = Library.KeybindFrame:FindFirstChildWhichIsA("TextLabel")
         if title then
@@ -118,11 +139,24 @@ local function ApplyMounxStyle(Library)
                 div.Name = "TitleDivider"
                 div.BackgroundColor3 = Library.AccentColor
                 div.BorderSizePixel = 0
-                div.Size = UDim2.new(1, -10, 0, 2)
-                div.Position = UDim2.new(0, 5, 1, 3)
+                div.Size = UDim2.new(1, -20, 0, 1)
+                div.Position = UDim2.new(0, 10, 1, 3)
                 div.Parent = title
+                Library:AddToRegistry(div, { BackgroundColor3 = "AccentColor" })
             end
         end
+        
+        if not Library.KeybindFrame:FindFirstChild("ProGradient") then
+            local grad = Instance.new("UIGradient")
+            grad.Name = "ProGradient"
+            grad.Rotation = 90
+            grad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 35)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 18))
+            })
+            grad.Parent = Library.KeybindFrame
+        end
+    end
         
         if not Library.KeybindFrame:FindFirstChild("ProGradient") then
             local grad = Instance.new("UIGradient")
@@ -161,27 +195,49 @@ local function ApplyMounxStyle(Library)
                 end
 
                                 -- Make dragging easier on mobile
-                if Library.IsMobile and obj.Parent and obj.Parent:IsA("Frame") then
-                    obj.Parent.Size = UDim2.new(0, 90, 0, 45)
-                    obj.Size = UDim2.new(1, 0, 1, -15)
-                    obj.Position = UDim2.new(0, 0, 0, 15)
+                                if Library.IsMobile and obj.Parent and obj.Parent:IsA("Frame") then
+                    obj.Parent.Size = UDim2.new(0, 100, 0, 40)
+                    obj.Size = UDim2.new(1, 0, 1, 0)
+                    obj.Position = UDim2.new(0, 0, 0, 0)
                     
                     if not obj.Parent:FindFirstChild("DragHandle") then
                         local drag = Instance.new("Frame")
                         drag.Name = "DragHandle"
                         drag.Size = UDim2.new(0, 30, 0, 4)
-                        drag.Position = UDim2.new(0.5, -15, 0, 5)
+                        drag.Position = UDim2.new(0.5, -15, 0, 4)
                         drag.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-                        drag.BackgroundTransparency = 0.5
+                        drag.BackgroundTransparency = 0.6
                         drag.BorderSizePixel = 0
                         Instance.new("UICorner", drag).CornerRadius = UDim.new(1, 0)
                         drag.Parent = obj.Parent
                     end
 
                     if txt == "Lock UI" or txt == "Unlock UI" then
-                        obj.Parent.Position = UDim2.new(0.5, 0, 0, 60)
+                        if not obj.Parent:GetAttribute("Moved") then obj.Parent.Position = UDim2.new(0.5, 0, 0, 65) end
                     else
-                        obj.Parent.Position = UDim2.new(0.5, 0, 0, 20)
+                        if not obj.Parent:GetAttribute("Moved") then obj.Parent.Position = UDim2.new(0.5, 0, 0, 15) end
+                    end
+                    
+                    obj.Parent:GetPropertyChangedSignal("Position"):Connect(function()
+                        obj.Parent:SetAttribute("Moved", true)
+                    end)
+                    
+                    if not obj:FindFirstChild("BtnGlow") then
+                        local stroke = Instance.new("UIStroke")
+                        stroke.Name = "BtnGlow"
+                        stroke.Color = Color3.fromRGB(255, 255, 255)
+                        stroke.Transparency = 0.8
+                        stroke.Thickness = 1
+                        stroke.Parent = obj
+                        Library:AddToRegistry(stroke, { Color = "AccentColor" })
+                        
+                        local grad = Instance.new("UIGradient")
+                        grad.Rotation = 90
+                        grad.Color = ColorSequence.new({
+                            ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 45)),
+                            ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 25))
+                        })
+                        grad.Parent = obj
                     end
                 else
                     obj.Size = UDim2.new(0, 90, 0, 28)
@@ -438,10 +494,9 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 local gName = (ok and info) and info.Name or "Game"
         local pName = game.Players.LocalPlayer and game.Players.LocalPlayer.DisplayName or "User"
         
-        if Library and not Library.Unloaded then
+                if Library and not Library.Unloaded then
             Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, 0))
             Library:SetWatermarkVisibility(false)
-            if Library.WatermarkOuter then Library.WatermarkOuter.Visible = false end
         end
         
         local RS = game:GetService("RunService")
@@ -456,9 +511,16 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 frames = 0
                 lastTime = tick()
             end
-                                    if Library and not Library.Unloaded then
-                if Library.WatermarkOuter and Library.WatermarkOuter.Visible then
-                    Library:SetWatermark(string.format("Mounx | %s | %s | %d FPS", gName, pName, fps))
+                                                            if Library and not Library.Unloaded then
+                local text = string.format("Mounx | %s | %s | %d FPS", gName, pName, fps)
+                if Library.WatermarkText then
+                    Library.WatermarkText.Text = text
+                    if Library.Watermark then
+                        pcall(function()
+                            local X, Y = Library:GetTextBounds(text, Library.Font, 14)
+                            Library.Watermark.Size = UDim2.new(0, X + 15, 0, (Y * 1.5) + 3)
+                        end)
+                    end
                 end
             end
         end)
@@ -475,6 +537,11 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
 end
 
 return MounxHub
+
+
+
+
+
 
 
 
