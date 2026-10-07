@@ -3,14 +3,10 @@ local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
--- Evitar Flash de inicio
 pcall(function() if Library.ScreenGui then Library.ScreenGui.Enabled = false end end)
 
 local HttpService = game:GetService("HttpService")
 
--- ==================================================
--- MOUNX CUSTOM THEMES (V16 - TODOS LOS TEMAS RESTAURADOS)
--- ==================================================
 ThemeManager.BuiltInThemes['Default'] = nil
 ThemeManager.BuiltInThemes['Mounx Default'] = { 1, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"141419","AccentColor":"a855f7","BackgroundColor":"0a0a0f","OutlineColor":"0a0a0f"}') }
 ThemeManager.BuiltInThemes['Bloody Red']    = { 2, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"191414","AccentColor":"ff3333","BackgroundColor":"0f0a0a","OutlineColor":"0f0a0a"}') }
@@ -31,9 +27,13 @@ MounxHub.SaveManager = SaveManager
 local UIS = game:GetService("UserInputService")
 local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
 
---// ============================================================
---// MOUNX STYLE ENGINE (PREMIUM V16)
---// ============================================================
+local function safeDestroy(obj)
+    pcall(function() Library:RemoveFromRegistry(obj) end)
+    pcall(function() if Library.RegistryMap then Library.RegistryMap[obj] = nil end end)
+    obj.Visible = false
+    obj:Destroy()
+end
+
 local function ApplyMounxStyle(Library)
     if not Library or not Library.ScreenGui then return end
     local gui = Library.ScreenGui
@@ -75,19 +75,29 @@ local function ApplyMounxStyle(Library)
 
     local function styleWidget(widget)
         if not widget then return end
-        addCorner(widget, 100)
+        addCorner(widget, 8) -- RECTANGULO COMO LINORIA
         pcall(function() widget.BorderSizePixel = 0 end)
+        
         for _, inner in ipairs(widget:GetDescendants()) do
-            if inner:IsA("GuiObject") then addCorner(inner, 100); pcall(function() inner.BorderSizePixel = 0 end) end
+            if inner:IsA("GuiObject") then 
+                -- Hacer circulares solo a los puntitos de estado!
+                if inner.Size.X.Offset <= 15 and inner.Size.X.Scale == 0 then
+                    addCorner(inner, 100)
+                else
+                    addCorner(inner, 8)
+                end
+                pcall(function() inner.BorderSizePixel = 0 end)
+            end
+            
             if inner:IsA("Frame") and inner.Size.Y.Offset <= 2 and inner.BorderSizePixel == 0 and inner.BackgroundColor3 == Library.AccentColor then
-                inner.Visible = false
-                inner:Destroy()
+                safeDestroy(inner)
             end
         end
+        
         if not widget:FindFirstChild("WidgetGlow") then
             local glow = Instance.new("UIStroke")
             glow.Name = "WidgetGlow"
-            glow.Thickness = 1.5
+            glow.Thickness = 1.2
             glow.Transparency = 0.2
             glow.Parent = widget
             Library:AddToRegistry(glow, { Color = "AccentColor" })
@@ -121,18 +131,17 @@ local function ApplyMounxStyle(Library)
                     end
                 end
 
-                -- ARREGLO DE SOBREPOSICIÓN: Si es "Lock UI", lo bajamos 40 pixeles para que no se cruce
-                if obj.Parent and not obj:FindFirstChild("PosFixed") then
-                    local marker = Instance.new("BoolValue", obj)
-                    marker.Name = "PosFixed"
-                    if txt == "Lock UI" or txt == "Unlock UI" then
-                        local pos = obj.Parent.Position
-                        obj.Parent.Position = UDim2.new(pos.X.Scale, pos.X.Offset, pos.Y.Scale, pos.Y.Offset + 40)
-                    end
+                -- NO tocamos el parent. Solo su propio tamano.
+                obj.Size = UDim2.new(0, 90, 0, 28)
+                
+                -- Agregamos un UIListLayout al parent para que no se traslapen automaticamente!
+                if obj.Parent and obj.Parent:IsA("Frame") and not obj.Parent:FindFirstChild("MounxList") then
+                    local list = Instance.new("UIListLayout")
+                    list.Name = "MounxList"
+                    list.Padding = UDim.new(0, 8)
+                    list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                    list.Parent = obj.Parent
                 end
-
-                obj.Size = UDim2.new(1, 0, 1, 0) 
-                if obj.Parent then obj.Parent.Size = UDim2.new(0, 100, 0, 32) end
                 
                 addCorner(obj, 100)
                 obj.BorderSizePixel = 0
@@ -147,7 +156,6 @@ local function ApplyMounxStyle(Library)
                     TextColor3 = "FontColor" 
                 })
                 
-                -- Hacerlos mucho mas lindos: Gradient 3D cristalino
                 if not obj:FindFirstChild("ButtonGlass") then
                     local grad = Instance.new("UIGradient")
                     grad.Name = "ButtonGlass"
@@ -163,7 +171,7 @@ local function ApplyMounxStyle(Library)
                     local stroke = Instance.new("UIStroke")
                     stroke.Name = "MobileOutline"
                     stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-                    stroke.Thickness = 2 -- Mas notorio y lindo
+                    stroke.Thickness = 2
                     stroke.Transparency = 0.1
                     stroke.Parent = obj
                     Library:AddToRegistry(stroke, { Color = "AccentColor" })
@@ -175,8 +183,7 @@ local function ApplyMounxStyle(Library)
         local name = obj.Name
 
         if obj.Size.Y.Offset <= 2 and obj.BorderSizePixel == 0 and obj.Parent and (obj.Parent.Name == "BoxInner" or obj.Parent.Name == "MainSectionInner" or obj.Parent.Name == "TabContainer") then
-            obj.Visible = false
-            obj:Destroy()
+            safeDestroy(obj)
             return
         end
 
@@ -350,6 +357,8 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     
     task.spawn(function()
         ApplyMounxStyle(Library)
+        -- ARREGLO DEL AUTOLOAD: Lo ejecutamos al final para que cargue la config si existe
+        pcall(function() SaveManager:LoadAutoloadConfig() end)
         pcall(function() Library.ScreenGui.Enabled = true end)
     end)
 end
