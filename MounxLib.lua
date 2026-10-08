@@ -365,7 +365,7 @@ local function ApplyMounxStyle(Library)
         styleObj(child) 
         
         local v = child
-        if v:IsA("ScrollingFrame") and v.Name == "Frame" and v.CanvasSize == UDim2.new(0, 0, 2, 0) then
+        if v:IsA("ScrollingFrame") and v.CanvasSize == UDim2.new(0, 0, 2, 0) then
             -- This is the TabArea
             local function setupTabs()
                 local activeLine = Instance.new("Frame")
