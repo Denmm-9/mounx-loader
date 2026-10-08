@@ -439,7 +439,7 @@ end
 function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     local MenuGroup = SettingsTab:AddLeftGroupbox('Menu & Close')
     MenuGroup:AddButton('Unload Script', function() Library:Unload() end)
-    MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'RightControl', NoUI = true, Text = 'Menu keybind' })
+    MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'X', NoUI = true, Text = 'Menu keybind' })
     Library.ToggleKeybind = Library.Options.MenuKeybind
     
     local ExtrasGroup = SettingsTab:AddRightGroupbox('Menu Extras')
