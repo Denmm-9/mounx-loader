@@ -436,6 +436,133 @@ local function ApplyMounxStyle(Library)
     end
 end
 
+function MounxHub:BuildServerTab(ServerTab)
+    local SrvInfoBox = ServerTab:AddLeftGroupbox('Server Info')
+    local gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or "Unknown Game"
+    SrvInfoBox:AddLabel('Game: ' .. gameName)
+    local lblPlayers = SrvInfoBox:AddLabel('Players: ' .. #game.Players:GetPlayers() .. '/' .. game.Players.MaxPlayers)
+    local jobIdStr = (game.JobId ~= "" and game.JobId:sub(1,8).."...") or "Private/Studio"
+    SrvInfoBox:AddLabel('JobId: ' .. jobIdStr)
+    
+    local SrvHopBox = ServerTab:AddRightGroupbox('Server Hop')
+    SrvHopBox:AddDropdown('ServerListDrop', { Values = {"Fetching servers..."}, Default = 1, Multi = false, Text = 'Public Servers' })
+    local actualJobIds = {}
+    
+    SrvHopBox:AddButton('Refresh Servers', function()
+        Library.Options.ServerListDrop:SetValues({"Fetching..."})
+        Library.Options.ServerListDrop:SetValue("Fetching...")
+        task.spawn(function()
+            local HttpService = game:GetService("HttpService")
+            local req = (request or http_request or (syn and syn.request))
+            local placeId = game.PlaceId
+            local urls = {
+                "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100",
+                "https://games.roproxy.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
+            }
+            
+            local finalData = nil
+            for _, url in ipairs(urls) do
+                local success, result = pcall(function()
+                    if req then return req({Url = url, Method = "GET"}).Body
+                    else return game:HttpGet(url) end
+                end)
+                
+                if success and result then
+                    local s, data = pcall(function() return HttpService:JSONDecode(result) end)
+                    if s and data and data.data then
+                        finalData = data; break
+                    end
+                end
+            end
+            
+            if finalData then
+                local list = {}
+                actualJobIds = {}
+                local count = 1
+                for _, srv in ipairs(finalData.data) do
+                    if srv.playing < srv.maxPlayers and srv.id ~= game.JobId then
+                        local p = srv.ping and math.floor(srv.ping) or "?"
+                        local srvName = "Srv #" .. count .. " [" .. srv.playing .. "/" .. srv.maxPlayers .. "] | Ping: " .. p .. "ms"
+                        while actualJobIds[srvName] do srvName = srvName .. " " end
+                        table.insert(list, srvName)
+                        actualJobIds[srvName] = srv.id
+                        count = count + 1
+                    end
+                end
+                if #list > 0 then
+                    Library.Options.ServerListDrop:SetValues(list)
+                    Library.Options.ServerListDrop:SetValue(list[1])
+                else
+                    Library.Options.ServerListDrop:SetValues({"No servers found"})
+                    Library.Options.ServerListDrop:SetValue("No servers found")
+                end
+            else
+                Library.Options.ServerListDrop:SetValues({"API Blocked/Down"})
+                Library.Options.ServerListDrop:SetValue("API Blocked/Down")
+            end
+        end)
+    end)
+    
+    SrvHopBox:AddButton('Teleport', function()
+        local selected = Library.Options.ServerListDrop.Value
+        if actualJobIds[selected] then
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, actualJobIds[selected], game.Players.LocalPlayer)
+        end
+    end)
+    
+    SrvHopBox:AddButton('Rejoin Current', function()
+        local ts = game:GetService("TeleportService")
+        local p = game.Players.LocalPlayer
+        if #game.Players:GetPlayers() <= 1 then
+            ts:Teleport(game.PlaceId, p)
+        else
+            ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, p)
+        end
+    end)
+    
+    local SrvMiscBox = ServerTab:AddLeftGroupbox('Misc')
+    SrvMiscBox:AddToggle('AntiAFKMounx', { Text = 'Anti-AFK', Default = false, Tooltip = 'Prevents the 20-minute idle kick.' })
+    Library.Toggles.AntiAFKMounx:OnChanged(function()
+        if Library.Toggles.AntiAFKMounx.Value then
+            pcall(function() for _,v in pairs(getconnections(game.Players.LocalPlayer.Idled)) do v:Disable() end end)
+        else
+            pcall(function() for _,v in pairs(getconnections(game.Players.LocalPlayer.Idled)) do v:Enable() end end)
+        end
+    end)
+    
+    SrvMiscBox:AddToggle('AutoExecuteTPMounx', { Text = 'Auto-Execute on TP', Default = false, Tooltip = 'Inyecta automáticamente el script al cambiar de servidor.' })
+    Library.Toggles.AutoExecuteTPMounx:OnChanged(function()
+        if Library.Toggles.AutoExecuteTPMounx.Value then
+            local qot = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport)
+            if qot then
+                local autoCode = getgenv().MounxAutoExecCode or [[
+                    task.wait(3)
+                    pcall(function()
+                        if isfile and isfile("MounxLoader.lua") then
+                            loadstring(readfile("MounxLoader.lua"))()
+                        else
+                            game.StarterGui:SetCore("SendNotification", {
+                                Title = "Mounx Auto-Execute",
+                                Text = "Si usas un Loader, define getgenv().MounxAutoExecCode en tu script base.",
+                                Duration = 10
+                            })
+                        end
+                    end)
+                ]]
+                qot(autoCode)
+            end
+        end
+    end)
+    
+    task.spawn(function()
+        while task.wait(5) do
+            if lblPlayers then
+                pcall(function() lblPlayers:SetText('Players: ' .. #game.Players:GetPlayers() .. '/' .. game.Players.MaxPlayers) end)
+            end
+        end
+    end)
+end
+
 function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     local MenuGroup = SettingsTab:AddLeftGroupbox('Menu & Close')
     MenuGroup:AddButton('Unload Script', function() Library:Unload() end)
