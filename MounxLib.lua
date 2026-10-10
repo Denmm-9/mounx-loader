@@ -530,7 +530,7 @@ function MounxHub:BuildServerTab(ServerTab)
         end
     end)
     
-    SrvMiscBox:AddToggle('AutoExecuteTPMounx', { Text = 'Auto-Execute on TP', Default = false, Tooltip = 'Inyecta automáticamente el script al cambiar de servidor.' })
+    SrvMiscBox:AddToggle('AutoExecuteTPMounx', { Text = 'Auto-Execute on TP', Default = false, Tooltip = 'Automatically injects the script when changing servers.' })
     Library.Toggles.AutoExecuteTPMounx:OnChanged(function()
         if Library.Toggles.AutoExecuteTPMounx.Value then
             local qot = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport)
@@ -543,7 +543,7 @@ function MounxHub:BuildServerTab(ServerTab)
                         else
                             game.StarterGui:SetCore("SendNotification", {
                                 Title = "Mounx Auto-Execute",
-                                Text = "Si usas un Loader, define getgenv().MounxAutoExecCode en tu script base.",
+                                Text = "If using a Loader, define getgenv().MounxAutoExecCode in your base script.",
                                 Duration = 10
                             })
                         end
@@ -615,7 +615,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     
     task.spawn(function()
         ApplyMounxStyle(Library)
-        -- ARREGLO DEL AUTOLOAD: Lo ejecutamos al final para que cargue la config si existe
+        -- AUTOLOAD FIX: Execute at the end to load config if exists
         pcall(function() SaveManager:LoadAutoloadConfig() end)
         pcall(function() Library.ScreenGui.Enabled = true end)
     end)
