@@ -312,9 +312,103 @@ local function ApplyMounxStyle(Library)
                             for _, topBar in ipairs(subChild:GetChildren()) do
                                 if topBar:IsA("Frame") and topBar.Size.Y.Offset == 1 then topBar.Visible = false end
                             end
+                            
+                            -- Window title gradient (on the title bar frame)
+                            local titleLabel = subChild:FindFirstChildWhichIsA("TextLabel")
+                            if titleLabel and not subChild:FindFirstChild("TitleGradOverlay") then
+                                local gradOverlay = Instance.new("Frame")
+                                gradOverlay.Name = "TitleGradOverlay"
+                                gradOverlay.BackgroundColor3 = Library.AccentColor
+                                gradOverlay.BackgroundTransparency = 0.88
+                                gradOverlay.BorderSizePixel = 0
+                                gradOverlay.Size = UDim2.new(1, 0, 1, 0)
+                                gradOverlay.ZIndex = subChild.ZIndex
+                                gradOverlay.Parent = subChild
+                                addCorner(gradOverlay, Config.WindowRadius - 2)
+                                Library:AddToRegistry(gradOverlay, { BackgroundColor3 = "AccentColor" })
+                                
+                                local titleGrad = Instance.new("UIGradient")
+                                titleGrad.Transparency = NumberSequence.new({
+                                    NumberSequenceKeypoint.new(0, 0),
+                                    NumberSequenceKeypoint.new(0.5, 0.5),
+                                    NumberSequenceKeypoint.new(1, 1),
+                                })
+                                titleGrad.Parent = gradOverlay
+                            end
                         end
                     end
                 end
+            end
+            
+            -- Footer status bar
+            if not obj:FindFirstChild("MounxFooter") then
+                local footer = Instance.new("Frame")
+                footer.Name = "MounxFooter"
+                footer.BackgroundColor3 = Color3.fromRGB(10, 8, 14)
+                footer.BackgroundTransparency = 0.3
+                footer.BorderSizePixel = 0
+                footer.Size = UDim2.new(1, -8, 0, 18)
+                footer.Position = UDim2.new(0, 4, 1, -22)
+                footer.ZIndex = obj.ZIndex + 10
+                footer.ClipsDescendants = true
+                footer.Parent = obj
+                addCorner(footer, 6)
+                
+                -- Footer accent line at top
+                local footerLine = Instance.new("Frame")
+                footerLine.Name = "FooterLine"
+                footerLine.BackgroundColor3 = Library.AccentColor
+                footerLine.BorderSizePixel = 0
+                footerLine.Size = UDim2.new(1, -20, 0, 1)
+                footerLine.Position = UDim2.new(0, 10, 0, 0)
+                footerLine.ZIndex = footer.ZIndex + 1
+                footerLine.Parent = footer
+                Library:AddToRegistry(footerLine, { BackgroundColor3 = "AccentColor" })
+                
+                local footerLineGrad = Instance.new("UIGradient")
+                footerLineGrad.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 1),
+                    NumberSequenceKeypoint.new(0.2, 0.3),
+                    NumberSequenceKeypoint.new(0.8, 0.3),
+                    NumberSequenceKeypoint.new(1, 1),
+                })
+                footerLineGrad.Parent = footerLine
+                
+                -- Footer text
+                local footerText = Instance.new("TextLabel")
+                footerText.Name = "FooterText"
+                footerText.BackgroundTransparency = 1
+                footerText.Size = UDim2.new(1, -16, 1, 0)
+                footerText.Position = UDim2.new(0, 8, 0, 1)
+                footerText.Font = Enum.Font.Gotham
+                footerText.TextSize = 9
+                footerText.TextColor3 = Color3.fromRGB(120, 115, 135)
+                footerText.TextXAlignment = Enum.TextXAlignment.Left
+                footerText.ZIndex = footer.ZIndex + 1
+                footerText.Parent = footer
+                
+                -- Version on right side
+                local footerVersion = Instance.new("TextLabel")
+                footerVersion.Name = "FooterVersion"
+                footerVersion.BackgroundTransparency = 1
+                footerVersion.Size = UDim2.new(0, 60, 1, 0)
+                footerVersion.Position = UDim2.new(1, -68, 0, 1)
+                footerVersion.Font = Enum.Font.Gotham
+                footerVersion.TextSize = 9
+                footerVersion.TextColor3 = Library.AccentColor
+                footerVersion.TextXAlignment = Enum.TextXAlignment.Right
+                footerVersion.Text = "v1.0"
+                footerVersion.ZIndex = footer.ZIndex + 1
+                footerVersion.Parent = footer
+                Library:AddToRegistry(footerVersion, { TextColor3 = "AccentColor" })
+                
+                -- Dynamic footer text update
+                task.spawn(function()
+                    task.wait(1)
+                    local ok, info = pcall(function() return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId) end)
+                    local gName = (ok and info) and info.Name or "Game"
+                    pcall(function() footerText.Text = "Mounx Hub | " .. gName end)
+                end)
             end
             return
         end
@@ -322,6 +416,24 @@ local function ApplyMounxStyle(Library)
         if name == "TabContainer" or name == "MainSectionOuter" or name == "MainSectionInner" or name == "BoxOuter" or name == "BoxInner" then
             addCorner(obj, Config.GroupRadius)
             obj.BorderSizePixel = 0
+            
+            -- Groupbox title accent dot
+            if name == "BoxInner" then
+                for _, child in ipairs(obj:GetChildren()) do
+                    if child:IsA("TextLabel") and not child:FindFirstChild("GBAccentDot") then
+                        local dot = Instance.new("Frame")
+                        dot.Name = "GBAccentDot"
+                        dot.BackgroundColor3 = Library.AccentColor
+                        dot.BorderSizePixel = 0
+                        dot.Size = UDim2.new(0, 4, 0, 4)
+                        dot.Position = UDim2.new(0, -1, 0, 5)
+                        dot.ZIndex = child.ZIndex + 1
+                        dot.Parent = child
+                        addCorner(dot, 100)
+                        Library:AddToRegistry(dot, { BackgroundColor3 = "AccentColor" })
+                    end
+                end
+            end
         end
 
         if obj.Size == UDim2.new(0, 13, 0, 13) then
@@ -351,6 +463,70 @@ local function ApplyMounxStyle(Library)
             end
             
             applyProHover(obj)
+            
+            -- Toggle pulse glow
+            if not obj:FindFirstChild("TogglePulse") then
+                local pulseStroke = Instance.new("UIStroke")
+                pulseStroke.Name = "TogglePulse"
+                pulseStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                pulseStroke.Thickness = 1.5
+                pulseStroke.Transparency = 1
+                pulseStroke.Parent = obj
+                Library:AddToRegistry(pulseStroke, { Color = "AccentColor" })
+                
+                -- Watch for fill color changes (toggle ON/OFF)
+                local function checkToggleState()
+                    local isOn = false
+                    for _, inner in ipairs(obj:GetChildren()) do
+                        if inner:IsA("Frame") and inner.Name ~= "CheckRing" and inner.Name ~= "TogglePulse" and inner.Name ~= "MounxCorner" then
+                            if inner.BackgroundTransparency < 0.5 then
+                                isOn = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    if isOn then
+                        -- Pulse animation loop
+                        task.spawn(function()
+                            while obj and obj.Parent and pulseStroke and pulseStroke.Parent do
+                                local stillOn = false
+                                for _, inner in ipairs(obj:GetChildren()) do
+                                    if inner:IsA("Frame") and inner.Name ~= "CheckRing" and inner.Name ~= "TogglePulse" and inner.Name ~= "MounxCorner" then
+                                        if inner.BackgroundTransparency < 0.5 then stillOn = true; break end
+                                    end
+                                end
+                                if not stillOn then
+                                    TweenService:Create(pulseStroke, TweenInfo.new(0.2), {Transparency = 1}):Play()
+                                    break
+                                end
+                                TweenService:Create(pulseStroke, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.3}):Play()
+                                task.wait(0.8)
+                                if not obj or not obj.Parent then break end
+                                TweenService:Create(pulseStroke, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.8}):Play()
+                                task.wait(0.8)
+                            end
+                        end)
+                    else
+                        pulseStroke.Transparency = 1
+                    end
+                end
+                
+                -- Monitor changes
+                for _, inner in ipairs(obj:GetChildren()) do
+                    if inner:IsA("Frame") and inner.Name ~= "CheckRing" and inner.Name ~= "TogglePulse" then
+                        inner:GetPropertyChangedSignal("BackgroundTransparency"):Connect(checkToggleState)
+                    end
+                end
+                obj.ChildAdded:Connect(function(child)
+                    task.wait(0.05)
+                    if child:IsA("Frame") and child.Name ~= "CheckRing" and child.Name ~= "TogglePulse" then
+                        child:GetPropertyChangedSignal("BackgroundTransparency"):Connect(checkToggleState)
+                    end
+                end)
+                
+                task.delay(0.1, checkToggleState)
+            end
         end
 
         if obj.Size == UDim2.new(1, -4, 0, 13) then
@@ -371,6 +547,17 @@ local function ApplyMounxStyle(Library)
                             fill.BorderSizePixel = 0
                             for _, secretLine in ipairs(fill:GetChildren()) do
                                 if secretLine:IsA("Frame") then safeDestroy(secretLine) end
+                            end
+                            
+                            -- Slider fill glow
+                            if not fill:FindFirstChild("SliderGlow") and fill.Size.X.Scale > 0 then
+                                local sliderGlow = Instance.new("UIStroke")
+                                sliderGlow.Name = "SliderGlow"
+                                sliderGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                                sliderGlow.Thickness = 1
+                                sliderGlow.Transparency = 0.4
+                                sliderGlow.Parent = fill
+                                Library:AddToRegistry(sliderGlow, { Color = "AccentColor" })
                             end
                         end
                     end
