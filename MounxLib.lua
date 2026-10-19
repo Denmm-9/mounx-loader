@@ -8,7 +8,7 @@ pcall(function() if Library.ScreenGui then Library.ScreenGui.Enabled = false end
 local HttpService = game:GetService("HttpService")
 
 ThemeManager.BuiltInThemes['Default'] = nil
-ThemeManager.BuiltInThemes['Mounx Default'] = { 1, HttpService:JSONDecode('{"FontColor":"f0ecf4","MainColor":"151118","AccentColor":"c084fc","BackgroundColor":"0e0b12","OutlineColor":"0e0b12"}') }
+ThemeManager.BuiltInThemes['Mounx Default'] = { 1, HttpService:JSONDecode('{"FontColor":"f5edf0","MainColor":"1a1018","AccentColor":"ff6b9d","BackgroundColor":"110a10","OutlineColor":"110a10"}') }
 ThemeManager.BuiltInThemes['Bloody Red']    = { 2, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"191414","AccentColor":"ff3333","BackgroundColor":"0f0a0a","OutlineColor":"0f0a0a"}') }
 ThemeManager.BuiltInThemes['Dark Neon']     = { 3, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"141922","AccentColor":"00f0ff","BackgroundColor":"0a0f14","OutlineColor":"0a0f14"}') }
 ThemeManager.BuiltInThemes['Cyberpunk']     = { 4, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"22141c","AccentColor":"ff00ff","BackgroundColor":"140a12","OutlineColor":"140a12"}') }
@@ -104,11 +104,11 @@ local function ApplyMounxStyle(Library)
     end
 
     if Library.WatermarkOuter then styleWidget(Library.WatermarkOuter) end
-            if Library.KeybindFrame then 
+    if Library.KeybindFrame then 
         local kf = Library.KeybindFrame
-        addCorner(kf, 10)
-        kf.BackgroundColor3 = Color3.fromRGB(14, 12, 18)
-        kf.BackgroundTransparency = 0.05
+        addCorner(kf, 12)
+        kf.BackgroundColor3 = Color3.fromRGB(14, 11, 18)
+        kf.BackgroundTransparency = 0.02
         kf.BorderSizePixel = 0
         
         -- Accent glow stroke
@@ -116,8 +116,8 @@ local function ApplyMounxStyle(Library)
             local stroke = Instance.new("UIStroke")
             stroke.Name = "KBStroke"
             stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            stroke.Thickness = 1
-            stroke.Transparency = 0.5
+            stroke.Thickness = 1.2
+            stroke.Transparency = 0.3
             stroke.Parent = kf
             Library:AddToRegistry(stroke, { Color = "AccentColor" })
         end
@@ -128,32 +128,71 @@ local function ApplyMounxStyle(Library)
             line.Name = "KBAccentLine"
             line.BackgroundColor3 = Library.AccentColor
             line.BorderSizePixel = 0
-            line.Size = UDim2.new(1, -16, 0, 2)
-            line.Position = UDim2.new(0, 8, 0, 2)
+            line.Size = UDim2.new(1, -12, 0, 2)
+            line.Position = UDim2.new(0, 6, 0, 0)
             line.ZIndex = kf.ZIndex + 5
             line.Parent = kf
-            addCorner(line, 1)
+            addCorner(line, 2)
             Library:AddToRegistry(line, { BackgroundColor3 = "AccentColor" })
             
             local lineGrad = Instance.new("UIGradient")
             lineGrad.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.8),
-                NumberSequenceKeypoint.new(0.2, 0),
-                NumberSequenceKeypoint.new(0.8, 0),
-                NumberSequenceKeypoint.new(1, 0.8),
+                NumberSequenceKeypoint.new(0, 1),
+                NumberSequenceKeypoint.new(0.15, 0),
+                NumberSequenceKeypoint.new(0.85, 0),
+                NumberSequenceKeypoint.new(1, 1),
             })
             lineGrad.Parent = line
+        end
+        
+        -- Bottom accent line mirror
+        if not kf:FindFirstChild("KBBottomLine") then
+            local bLine = Instance.new("Frame")
+            bLine.Name = "KBBottomLine"
+            bLine.BackgroundColor3 = Library.AccentColor
+            bLine.BorderSizePixel = 0
+            bLine.Size = UDim2.new(1, -24, 0, 1)
+            bLine.Position = UDim2.new(0, 12, 1, -1)
+            bLine.ZIndex = kf.ZIndex + 5
+            bLine.Parent = kf
+            addCorner(bLine, 1)
+            Library:AddToRegistry(bLine, { BackgroundColor3 = "AccentColor" })
+            
+            local bLineGrad = Instance.new("UIGradient")
+            bLineGrad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 1),
+                NumberSequenceKeypoint.new(0.3, 0.5),
+                NumberSequenceKeypoint.new(0.7, 0.5),
+                NumberSequenceKeypoint.new(1, 1),
+            })
+            bLineGrad.Parent = bLine
+        end
+        
+        -- Title header bar background
+        if not kf:FindFirstChild("KBTitleBG") then
+            local titleBG = Instance.new("Frame")
+            titleBG.Name = "KBTitleBG"
+            titleBG.BackgroundColor3 = Library.AccentColor
+            titleBG.BackgroundTransparency = 0.9
+            titleBG.BorderSizePixel = 0
+            titleBG.Size = UDim2.new(1, -4, 0, 22)
+            titleBG.Position = UDim2.new(0, 2, 0, 2)
+            titleBG.ZIndex = kf.ZIndex + 1
+            titleBG.Parent = kf
+            addCorner(titleBG, 8)
+            Library:AddToRegistry(titleBG, { BackgroundColor3 = "AccentColor" })
         end
         
         -- Style the title label
         local title = kf:FindFirstChildWhichIsA("TextLabel")
         if title then
             title.Font = Enum.Font.GothamBold
-            title.TextSize = 12
-            title.TextColor3 = Color3.fromRGB(210, 200, 225)
+            title.TextSize = 11
+            title.TextColor3 = Color3.fromRGB(220, 210, 235)
+            title.ZIndex = kf.ZIndex + 3
         end
         
-        -- Style each keybind entry as it appears
+        -- Style each keybind entry
         local function styleEntry(label)
             if not label or not label:IsA("TextLabel") then return end
             if label == title then return end
@@ -161,22 +200,32 @@ local function ApplyMounxStyle(Library)
             
             label.Font = Enum.Font.GothamMedium
             label.TextSize = 11
-            label.TextColor3 = Color3.fromRGB(180, 175, 195)
-            label.BackgroundColor3 = Color3.fromRGB(20, 17, 26)
-            label.BackgroundTransparency = 0.4
-            addCorner(label, 5)
+            label.TextColor3 = Color3.fromRGB(190, 185, 205)
+            label.BackgroundColor3 = Color3.fromRGB(22, 18, 30)
+            label.BackgroundTransparency = 0.15
+            label.ZIndex = kf.ZIndex + 2
+            addCorner(label, 6)
             
-            -- Small left accent bar on each entry
-            local dot = Instance.new("Frame")
-            dot.Name = "EntryDot"
-            dot.BackgroundColor3 = Library.AccentColor
-            dot.BorderSizePixel = 0
-            dot.Size = UDim2.new(0, 2, 0, 10)
-            dot.Position = UDim2.new(0, 3, 0.5, -5)
-            dot.ZIndex = label.ZIndex + 1
-            dot.Parent = label
-            addCorner(dot, 1)
-            Library:AddToRegistry(dot, { BackgroundColor3 = "AccentColor" })
+            -- Left accent bar per entry
+            local accentBar = Instance.new("Frame")
+            accentBar.Name = "EntryDot"
+            accentBar.BackgroundColor3 = Library.AccentColor
+            accentBar.BorderSizePixel = 0
+            accentBar.Size = UDim2.new(0, 3, 0, 12)
+            accentBar.Position = UDim2.new(0, 2, 0.5, -6)
+            accentBar.ZIndex = label.ZIndex + 1
+            accentBar.Parent = label
+            addCorner(accentBar, 2)
+            Library:AddToRegistry(accentBar, { BackgroundColor3 = "AccentColor" })
+            
+            -- Subtle inner padding
+            if not label:FindFirstChild("KBPad") then
+                local pad = Instance.new("UIPadding")
+                pad.Name = "KBPad"
+                pad.PaddingLeft = UDim.new(0, 8)
+                pad.PaddingRight = UDim.new(0, 4)
+                pad.Parent = label
+            end
             
             local tag = Instance.new("BoolValue")
             tag.Name = "KBStyled"
@@ -469,7 +518,7 @@ local function ApplyMounxStyle(Library)
                 local pulseStroke = Instance.new("UIStroke")
                 pulseStroke.Name = "TogglePulse"
                 pulseStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-                pulseStroke.Thickness = 1.5
+                pulseStroke.Thickness = 1.0
                 pulseStroke.Transparency = 1
                 pulseStroke.Parent = obj
                 Library:AddToRegistry(pulseStroke, { Color = "AccentColor" })
@@ -500,11 +549,11 @@ local function ApplyMounxStyle(Library)
                                     TweenService:Create(pulseStroke, TweenInfo.new(0.2), {Transparency = 1}):Play()
                                     break
                                 end
-                                TweenService:Create(pulseStroke, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.3}):Play()
-                                task.wait(0.8)
+                                TweenService:Create(pulseStroke, TweenInfo.new(1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.6}):Play()
+                                task.wait(1.0)
                                 if not obj or not obj.Parent then break end
-                                TweenService:Create(pulseStroke, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.8}):Play()
-                                task.wait(0.8)
+                                TweenService:Create(pulseStroke, TweenInfo.new(1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Transparency = 0.92}):Play()
+                                task.wait(1.0)
                             end
                         end)
                     else
@@ -874,6 +923,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         local gName = (ok and info) and info.Name or "Game"
         local pName = game.Players.LocalPlayer and game.Players.LocalPlayer.DisplayName or "User"
         local RunService = game:GetService("RunService")
+        local startTime = tick()
         
         -- FPS counter (safe: updates every 0.5s, NOT every frame)
         local frameCount = 0
@@ -884,13 +934,22 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
             frameCount = frameCount + 1
         end)
         
-        -- Set initial watermark text (but DO NOT change visibility)
+        -- Helper: enforce watermark visibility based on toggle
+        local function enforceWmVisibility()
+            if not Library.Toggles.WatermarkToggle or not Library.Toggles.WatermarkToggle.Value then
+                pcall(function() Library:SetWatermarkVisibility(false) end)
+                pcall(function() Library.WatermarkOuter.Visible = false end)
+            end
+        end
+        
+        -- Set initial watermark text (but enforce toggle state)
         pcall(function()
-            local text = "Mounx | " .. tostring(gName) .. " | " .. tostring(pName) .. " | 0 FPS"
+            local text = tostring(pName) .. " | " .. tostring(gName) .. " | 0 FPS | 0m 0s"
             Library:SetWatermark(text)
+            enforceWmVisibility()
         end)
         
-        -- Update watermark text with FPS every 0.5 seconds (ONLY text, never visibility)
+        -- Update watermark text with FPS every 0.5 seconds
         task.spawn(function()
             while not Library.Unloaded do
                 task.wait(0.5)
@@ -902,10 +961,16 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 frameCount = 0
                 lastTime = now
                 
+                -- Calculate runtime
+                local elapsed = tick() - startTime
+                local mins = math.floor(elapsed / 60)
+                local secs = math.floor(elapsed % 60)
+                
                 pcall(function()
                     if Library and not Library.Unloaded then
-                        local text = "Mounx | " .. tostring(gName) .. " | " .. tostring(pName) .. " | " .. tostring(currentFPS) .. " FPS"
+                        local text = tostring(pName) .. " | " .. tostring(gName) .. " | " .. tostring(currentFPS) .. " FPS | " .. tostring(mins) .. "m " .. tostring(secs) .. "s"
                         Library:SetWatermark(text)
+                        enforceWmVisibility()
                     end
                 end)
             end
