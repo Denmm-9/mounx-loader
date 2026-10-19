@@ -105,34 +105,99 @@ local function ApplyMounxStyle(Library)
 
     if Library.WatermarkOuter then styleWidget(Library.WatermarkOuter) end
             if Library.KeybindFrame then 
-        styleWidget(Library.KeybindFrame) 
-        Library.KeybindFrame.BackgroundTransparency = 0.1
-        Library.KeybindFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        local kf = Library.KeybindFrame
+        styleWidget(kf) 
+        kf.BackgroundTransparency = 0.05
+        kf.BackgroundColor3 = Color3.fromRGB(14, 14, 18)
+        addCorner(kf, 10)
         
-        local title = Library.KeybindFrame:FindFirstChildWhichIsA("TextLabel")
-        if title then
-            title.Font = Enum.Font.GothamBold
-            title.TextColor3 = Color3.fromRGB(255, 255, 255)
-            if not title:FindFirstChild("TitleDivider") then
-                local div = Instance.new("Frame")
-                div.Name = "TitleDivider"
-                div.BackgroundColor3 = Library.AccentColor
-                div.BorderSizePixel = 0
-                div.Size = UDim2.new(1, -10, 0, 2)
-                div.Position = UDim2.new(0, 5, 1, 3)
-                div.Parent = title
-            end
+        -- Subtle drop shadow
+        if not kf:FindFirstChild("KFShadow") then
+            local shadow = Instance.new("ImageLabel")
+            shadow.Name = "KFShadow"
+            shadow.BackgroundTransparency = 1
+            shadow.Image = "rbxassetid://6015897843"
+            shadow.ImageColor3 = Color3.new(0, 0, 0)
+            shadow.ImageTransparency = 0.5
+            shadow.ScaleType = Enum.ScaleType.Slice
+            shadow.SliceCenter = Rect.new(49, 49, 450, 450)
+            shadow.Size = UDim2.new(1, 30, 1, 30)
+            shadow.Position = UDim2.new(0, -15, 0, -15)
+            shadow.ZIndex = kf.ZIndex - 1
+            shadow.Parent = kf
         end
         
-        if not Library.KeybindFrame:FindFirstChild("ProGradient") then
+        -- Accent top bar (thin elegant line)
+        if not kf:FindFirstChild("AccentTopBar") then
+            local topBar = Instance.new("Frame")
+            topBar.Name = "AccentTopBar"
+            topBar.BackgroundColor3 = Library.AccentColor
+            topBar.BorderSizePixel = 0
+            topBar.Size = UDim2.new(1, -16, 0, 2)
+            topBar.Position = UDim2.new(0, 8, 0, 6)
+            topBar.ZIndex = kf.ZIndex + 5
+            topBar.Parent = kf
+            addCorner(topBar, 1)
+            Library:AddToRegistry(topBar, { BackgroundColor3 = "AccentColor" })
+            
+            local barGrad = Instance.new("UIGradient")
+            barGrad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0.6),
+                NumberSequenceKeypoint.new(0.3, 0),
+                NumberSequenceKeypoint.new(0.7, 0),
+                NumberSequenceKeypoint.new(1, 0.6),
+            })
+            barGrad.Parent = topBar
+        end
+        
+        -- Outer subtle stroke
+        if not kf:FindFirstChild("KFStroke") then
+            local stroke = Instance.new("UIStroke")
+            stroke.Name = "KFStroke"
+            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            stroke.Thickness = 1
+            stroke.Color = Color3.fromRGB(40, 40, 50)
+            stroke.Transparency = 0.3
+            stroke.Parent = kf
+        end
+        
+        -- Style the title
+        local title = kf:FindFirstChildWhichIsA("TextLabel")
+        if title then
+            title.Font = Enum.Font.GothamBold
+            title.TextSize = 13
+            title.TextColor3 = Color3.fromRGB(220, 220, 230)
+            title.TextTransparency = 0.1
+        end
+        
+        -- Style individual keybind entries
+        local function styleKeybindEntries()
+            for _, child in ipairs(kf:GetChildren()) do
+                if child:IsA("TextLabel") and child ~= title and not child:FindFirstChild("KBStyled") then
+                    child.Font = Enum.Font.GothamMedium
+                    child.TextSize = 12
+                    child.TextColor3 = Color3.fromRGB(180, 180, 195)
+                    child.BackgroundTransparency = 1
+                    
+                    local tag = Instance.new("BoolValue")
+                    tag.Name = "KBStyled"
+                    tag.Parent = child
+                end
+            end
+        end
+        styleKeybindEntries()
+        kf.ChildAdded:Connect(function() task.wait(0.05) styleKeybindEntries() end)
+        
+        -- Background gradient for depth
+        if not kf:FindFirstChild("ProGradient") then
             local grad = Instance.new("UIGradient")
             grad.Name = "ProGradient"
-            grad.Rotation = 45
+            grad.Rotation = 180
             grad.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-                ColorSequenceKeypoint.new(1, Color3.new(0.5, 0.5, 0.5))
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 200, 210))
             })
-            grad.Parent = Library.KeybindFrame
+            grad.Parent = kf
         end
     end
 
@@ -578,7 +643,30 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     if not isMobile then
         ExtrasGroup:AddToggle('KeybindsToggle', {
             Text = 'Show Keybinds', Default = false,
-            Callback = function(v) Library.KeybindFrame.Visible = v end
+            Callback = function(v) 
+                local kf = Library.KeybindFrame
+                if not kf then return end
+                local ts = game:GetService("TweenService")
+                if v then
+                    kf.Visible = true
+                    kf.BackgroundTransparency = 1
+                    ts:Create(kf, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.05}):Play()
+                    for _, c in ipairs(kf:GetChildren()) do
+                        if c:IsA("TextLabel") then
+                            c.TextTransparency = 1
+                            ts:Create(c, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
+                        end
+                    end
+                else
+                    ts:Create(kf, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
+                    for _, c in ipairs(kf:GetChildren()) do
+                        if c:IsA("TextLabel") then
+                            ts:Create(c, TweenInfo.new(0.15), {TextTransparency = 1}):Play()
+                        end
+                    end
+                    task.delay(0.25, function() if not Library.Toggles.KeybindsToggle.Value then kf.Visible = false end end)
+                end
+            end
         })
     else
         pcall(function() if Library.KeybindFrame then Library.KeybindFrame:Destroy() end end)
