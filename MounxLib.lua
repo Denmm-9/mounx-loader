@@ -8,7 +8,7 @@ pcall(function() if Library.ScreenGui then Library.ScreenGui.Enabled = false end
 local HttpService = game:GetService("HttpService")
 
 ThemeManager.BuiltInThemes['Default'] = nil
-ThemeManager.BuiltInThemes['Mounx Default'] = { 1, HttpService:JSONDecode('{"FontColor":"f0f0f8","MainColor":"12121a","AccentColor":"818cf8","BackgroundColor":"0c0d14","OutlineColor":"0c0d14"}') }
+ThemeManager.BuiltInThemes['Mounx Default'] = { 1, HttpService:JSONDecode('{"FontColor":"f0ecf4","MainColor":"151118","AccentColor":"c084fc","BackgroundColor":"0e0b12","OutlineColor":"0e0b12"}') }
 ThemeManager.BuiltInThemes['Bloody Red']    = { 2, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"191414","AccentColor":"ff3333","BackgroundColor":"0f0a0a","OutlineColor":"0f0a0a"}') }
 ThemeManager.BuiltInThemes['Dark Neon']     = { 3, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"141922","AccentColor":"00f0ff","BackgroundColor":"0a0f14","OutlineColor":"0a0f14"}') }
 ThemeManager.BuiltInThemes['Cyberpunk']     = { 4, HttpService:JSONDecode('{"FontColor":"ffffff","MainColor":"22141c","AccentColor":"ff00ff","BackgroundColor":"140a12","OutlineColor":"140a12"}') }
@@ -106,248 +106,93 @@ local function ApplyMounxStyle(Library)
     if Library.WatermarkOuter then styleWidget(Library.WatermarkOuter) end
             if Library.KeybindFrame then 
         local kf = Library.KeybindFrame
-        
-        -- Hide the original ugly frame completely
-        kf.BackgroundTransparency = 1
+        addCorner(kf, 10)
+        kf.BackgroundColor3 = Color3.fromRGB(14, 12, 18)
+        kf.BackgroundTransparency = 0.05
         kf.BorderSizePixel = 0
-        pcall(function() for _, c in ipairs(kf:GetChildren()) do c.Visible = false end end)
         
-        -- Create a completely custom keybind overlay
-        if not kf:FindFirstChild("MounxKBOverlay") then
-            local overlay = Instance.new("Frame")
-            overlay.Name = "MounxKBOverlay"
-            overlay.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
-            overlay.BackgroundTransparency = 0.08
-            overlay.BorderSizePixel = 0
-            overlay.Size = UDim2.new(1, 10, 1, 10)
-            overlay.Position = UDim2.new(0, -5, 0, -5)
-            overlay.ZIndex = kf.ZIndex + 10
-            overlay.ClipsDescendants = true
-            overlay.Parent = kf
-            addCorner(overlay, 10)
-            
-            -- Outer glow stroke
-            local outerStroke = Instance.new("UIStroke")
-            outerStroke.Name = "KBGlow"
-            outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            outerStroke.Thickness = 1
-            outerStroke.Transparency = 0.6
-            outerStroke.Parent = overlay
-            Library:AddToRegistry(outerStroke, { Color = "AccentColor" })
-            
-            -- Background gradient (top to bottom fade)
-            local bgGrad = Instance.new("UIGradient")
-            bgGrad.Rotation = 180
-            bgGrad.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0),
-                NumberSequenceKeypoint.new(0.7, 0),
-                NumberSequenceKeypoint.new(1, 0.15),
-            })
-            bgGrad.Parent = overlay
-            
-            -- Top accent line (horizontal, faded edges)
-            local accentLine = Instance.new("Frame")
-            accentLine.Name = "AccentLine"
-            accentLine.BackgroundColor3 = Library.AccentColor
-            accentLine.BorderSizePixel = 0
-            accentLine.Size = UDim2.new(1, -20, 0, 1)
-            accentLine.Position = UDim2.new(0, 10, 0, 0)
-            accentLine.ZIndex = overlay.ZIndex + 1
-            accentLine.Parent = overlay
-            Library:AddToRegistry(accentLine, { BackgroundColor3 = "AccentColor" })
+        -- Accent glow stroke
+        if not kf:FindFirstChild("KBStroke") then
+            local stroke = Instance.new("UIStroke")
+            stroke.Name = "KBStroke"
+            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            stroke.Thickness = 1
+            stroke.Transparency = 0.5
+            stroke.Parent = kf
+            Library:AddToRegistry(stroke, { Color = "AccentColor" })
+        end
+        
+        -- Top accent line with faded edges
+        if not kf:FindFirstChild("KBAccentLine") then
+            local line = Instance.new("Frame")
+            line.Name = "KBAccentLine"
+            line.BackgroundColor3 = Library.AccentColor
+            line.BorderSizePixel = 0
+            line.Size = UDim2.new(1, -16, 0, 2)
+            line.Position = UDim2.new(0, 8, 0, 2)
+            line.ZIndex = kf.ZIndex + 5
+            line.Parent = kf
+            addCorner(line, 1)
+            Library:AddToRegistry(line, { BackgroundColor3 = "AccentColor" })
             
             local lineGrad = Instance.new("UIGradient")
             lineGrad.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 1),
-                NumberSequenceKeypoint.new(0.15, 0),
-                NumberSequenceKeypoint.new(0.85, 0),
-                NumberSequenceKeypoint.new(1, 1),
+                NumberSequenceKeypoint.new(0, 0.8),
+                NumberSequenceKeypoint.new(0.2, 0),
+                NumberSequenceKeypoint.new(0.8, 0),
+                NumberSequenceKeypoint.new(1, 0.8),
             })
-            lineGrad.Parent = accentLine
-            
-            -- Title row
-            local titleRow = Instance.new("Frame")
-            titleRow.Name = "TitleRow"
-            titleRow.BackgroundTransparency = 1
-            titleRow.Size = UDim2.new(1, 0, 0, 22)
-            titleRow.Position = UDim2.new(0, 0, 0, 4)
-            titleRow.ZIndex = overlay.ZIndex + 2
-            titleRow.Parent = overlay
-            
-            local titleIcon = Instance.new("TextLabel")
-            titleIcon.Name = "TitleIcon"
-            titleIcon.BackgroundTransparency = 1
-            titleIcon.Size = UDim2.new(0, 22, 1, 0)
-            titleIcon.Position = UDim2.new(0, 8, 0, 0)
-            titleIcon.Font = Enum.Font.GothamBold
-            titleIcon.Text = "//"
-            titleIcon.TextSize = 10
-            titleIcon.TextColor3 = Library.AccentColor
-            titleIcon.TextXAlignment = Enum.TextXAlignment.Center
-            titleIcon.ZIndex = overlay.ZIndex + 3
-            titleIcon.Parent = titleRow
-            Library:AddToRegistry(titleIcon, { TextColor3 = "AccentColor" })
-            
-            local titleLabel = Instance.new("TextLabel")
-            titleLabel.Name = "TitleLabel"
-            titleLabel.BackgroundTransparency = 1
-            titleLabel.Size = UDim2.new(1, -35, 1, 0)
-            titleLabel.Position = UDim2.new(0, 28, 0, 0)
-            titleLabel.Font = Enum.Font.GothamBold
-            titleLabel.Text = "KEYBINDS"
-            titleLabel.TextSize = 11
-            titleLabel.TextColor3 = Color3.fromRGB(200, 200, 215)
-            titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-            titleLabel.ZIndex = overlay.ZIndex + 3
-            titleLabel.Parent = titleRow
-            
-            -- Separator under title
-            local sep = Instance.new("Frame")
-            sep.Name = "TitleSep"
-            sep.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
-            sep.BorderSizePixel = 0
-            sep.Size = UDim2.new(1, -20, 0, 1)
-            sep.Position = UDim2.new(0, 10, 0, 26)
-            sep.ZIndex = overlay.ZIndex + 2
-            sep.Parent = overlay
-            
-            -- Container for keybind entries
-            local entryContainer = Instance.new("Frame")
-            entryContainer.Name = "EntryContainer"
-            entryContainer.BackgroundTransparency = 1
-            entryContainer.Size = UDim2.new(1, 0, 1, -30)
-            entryContainer.Position = UDim2.new(0, 0, 0, 30)
-            entryContainer.ZIndex = overlay.ZIndex + 2
-            entryContainer.Parent = overlay
-            
-            local entryLayout = Instance.new("UIListLayout")
-            entryLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            entryLayout.Padding = UDim.new(0, 2)
-            entryLayout.Parent = entryContainer
-            
-            local entryPadding = Instance.new("UIPadding")
-            entryPadding.PaddingLeft = UDim.new(0, 8)
-            entryPadding.PaddingRight = UDim.new(0, 8)
-            entryPadding.PaddingTop = UDim.new(0, 2)
-            entryPadding.Parent = entryContainer
-            
-            -- Function to create a styled keybind entry
-            local function createEntry(keyText, actionText, typeText)
-                local row = Instance.new("Frame")
-                row.Name = "KBEntry_" .. keyText
-                row.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
-                row.BackgroundTransparency = 0.3
-                row.BorderSizePixel = 0
-                row.Size = UDim2.new(1, 0, 0, 22)
-                row.ZIndex = overlay.ZIndex + 3
-                row.Parent = entryContainer
-                addCorner(row, 5)
-                
-                -- Key badge
-                local badge = Instance.new("Frame")
-                badge.Name = "KeyBadge"
-                badge.BackgroundColor3 = Library.AccentColor
-                badge.BackgroundTransparency = 0.75
-                badge.BorderSizePixel = 0
-                badge.Size = UDim2.new(0, 24, 0, 16)
-                badge.Position = UDim2.new(0, 4, 0.5, -8)
-                badge.ZIndex = overlay.ZIndex + 4
-                badge.Parent = row
-                addCorner(badge, 4)
-                Library:AddToRegistry(badge, { BackgroundColor3 = "AccentColor" })
-                
-                local badgeText = Instance.new("TextLabel")
-                badgeText.Name = "BadgeText"
-                badgeText.BackgroundTransparency = 1
-                badgeText.Size = UDim2.new(1, 0, 1, 0)
-                badgeText.Font = Enum.Font.GothamBold
-                badgeText.Text = keyText
-                badgeText.TextSize = 10
-                badgeText.TextColor3 = Library.AccentColor
-                badgeText.ZIndex = overlay.ZIndex + 5
-                badgeText.Parent = badge
-                Library:AddToRegistry(badgeText, { TextColor3 = "AccentColor" })
-                
-                -- Action name
-                local actionLabel = Instance.new("TextLabel")
-                actionLabel.Name = "ActionLabel"
-                actionLabel.BackgroundTransparency = 1
-                actionLabel.Size = UDim2.new(1, -75, 1, 0)
-                actionLabel.Position = UDim2.new(0, 34, 0, 0)
-                actionLabel.Font = Enum.Font.GothamMedium
-                actionLabel.Text = actionText
-                actionLabel.TextSize = 11
-                actionLabel.TextColor3 = Color3.fromRGB(185, 185, 200)
-                actionLabel.TextXAlignment = Enum.TextXAlignment.Left
-                actionLabel.TextTruncate = Enum.TextTruncate.AtEnd
-                actionLabel.ZIndex = overlay.ZIndex + 5
-                actionLabel.Parent = row
-                
-                -- Type indicator (Toggle/Hold)
-                local typeLabel = Instance.new("TextLabel")
-                typeLabel.Name = "TypeLabel"
-                typeLabel.BackgroundTransparency = 1
-                typeLabel.Size = UDim2.new(0, 38, 0, 14)
-                typeLabel.Position = UDim2.new(1, -42, 0.5, -7)
-                typeLabel.Font = Enum.Font.Gotham
-                typeLabel.Text = typeText
-                typeLabel.TextSize = 9
-                typeLabel.ZIndex = overlay.ZIndex + 5
-                typeLabel.Parent = row
-                
-                if typeText == "Hold" then
-                    typeLabel.TextColor3 = Color3.fromRGB(255, 180, 100)
-                else
-                    typeLabel.TextColor3 = Library.AccentColor
-                    Library:AddToRegistry(typeLabel, { TextColor3 = "AccentColor" })
-                end
-                
-                return row
-            end
-            
-            -- Function to sync overlay with LinoriaLib keybind data
-            local function syncKeybinds()
-                -- Clear old entries
-                for _, child in ipairs(entryContainer:GetChildren()) do
-                    if child:IsA("Frame") and child.Name:find("KBEntry_") then
-                        child:Destroy()
-                    end
-                end
-                
-                -- Parse original keybind labels from LinoriaLib
-                for _, child in ipairs(kf:GetChildren()) do
-                    if child:IsA("TextLabel") and child.Name ~= "Title" then
-                        local raw = child.Text or ""
-                        -- LinoriaLib format: "  [V] Trajectory Curve (Toggle)"
-                        local key, action, ktype = raw:match("%[(.-)%]%s*(.-)%s*%((.-)%)")
-                        if key and action and ktype then
-                            createEntry(key, action, ktype)
-                        end
-                    end
-                end
-                
-                -- Resize overlay to fit content
-                task.wait(0.05)
-                local contentHeight = entryLayout.AbsoluteContentSize.Y + 38
-                overlay.Size = UDim2.new(1, 10, 0, math.max(contentHeight, 40))
-            end
-            
-            -- Initial sync + listen for changes
-            task.delay(0.2, syncKeybinds)
-            kf.ChildAdded:Connect(function() task.wait(0.1) syncKeybinds() end)
-            kf.ChildRemoved:Connect(function() task.wait(0.1) syncKeybinds() end)
-            
-            -- Also re-sync when text changes on existing labels
-            task.spawn(function()
-                while task.wait(1) do
-                    if kf and kf.Parent then
-                        syncKeybinds()
-                    else
-                        break
-                    end
-                end
-            end)
+            lineGrad.Parent = line
         end
+        
+        -- Style the title label
+        local title = kf:FindFirstChildWhichIsA("TextLabel")
+        if title then
+            title.Font = Enum.Font.GothamBold
+            title.TextSize = 12
+            title.TextColor3 = Color3.fromRGB(210, 200, 225)
+        end
+        
+        -- Style each keybind entry as it appears
+        local function styleEntry(label)
+            if not label or not label:IsA("TextLabel") then return end
+            if label == title then return end
+            if label:FindFirstChild("KBStyled") then return end
+            
+            label.Font = Enum.Font.GothamMedium
+            label.TextSize = 11
+            label.TextColor3 = Color3.fromRGB(180, 175, 195)
+            label.BackgroundColor3 = Color3.fromRGB(20, 17, 26)
+            label.BackgroundTransparency = 0.4
+            addCorner(label, 5)
+            
+            -- Small left accent bar on each entry
+            local dot = Instance.new("Frame")
+            dot.Name = "EntryDot"
+            dot.BackgroundColor3 = Library.AccentColor
+            dot.BorderSizePixel = 0
+            dot.Size = UDim2.new(0, 2, 0, 10)
+            dot.Position = UDim2.new(0, 3, 0.5, -5)
+            dot.ZIndex = label.ZIndex + 1
+            dot.Parent = label
+            addCorner(dot, 1)
+            Library:AddToRegistry(dot, { BackgroundColor3 = "AccentColor" })
+            
+            local tag = Instance.new("BoolValue")
+            tag.Name = "KBStyled"
+            tag.Parent = label
+        end
+        
+        -- Style existing entries
+        for _, child in ipairs(kf:GetChildren()) do
+            styleEntry(child)
+        end
+        
+        -- Style new entries when they appear
+        kf.ChildAdded:Connect(function(child)
+            task.wait(0.05)
+            styleEntry(child)
+        end)
     end
 
     local function styleObj(obj)
@@ -852,7 +697,13 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
             frameCount = frameCount + 1
         end)
         
-        -- Update watermark with FPS every 0.5 seconds
+        -- Set initial watermark text (but DO NOT change visibility)
+        pcall(function()
+            local text = "Mounx | " .. tostring(gName) .. " | " .. tostring(pName) .. " | 0 FPS"
+            Library:SetWatermark(text)
+        end)
+        
+        -- Update watermark text with FPS every 0.5 seconds (ONLY text, never visibility)
         task.spawn(function()
             while not Library.Unloaded do
                 task.wait(0.5)
@@ -872,14 +723,6 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 end)
             end
         end)
-        
-        -- Initial set
-        if Library and not Library.Unloaded then
-            local text = "Mounx | " .. tostring(gName) .. " | " .. tostring(pName) .. " | 0 FPS"
-            pcall(function() Library:SetWatermark(text) end)
-            pcall(function() Library:SetWatermarkVisibility(wmToggle.Value) end)
-            pcall(function() if Library.WatermarkOuter then Library.WatermarkOuter.Visible = wmToggle.Value end end)
-        end
     end)
     
     task.spawn(function()
