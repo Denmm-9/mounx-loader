@@ -538,18 +538,15 @@ local function ApplyMounxStyle(Library)
             end
         end
         
-        -- Visibility sync: intercept kf.Visible changes
-        local blockVis = false
+        -- Visibility sync: MIRROR kf.Visible to mxKB (never set kf.Visible = false!)
+        -- Keeping kf visible but transparent lets LinoriaLib populate entries normally.
         kf:GetPropertyChangedSignal("Visible"):Connect(function()
-            if blockVis then return end
-            blockVis = true
+            mxKB.Visible = kf.Visible
             if kf.Visible then
-                mxKB.Visible = true
-                syncContent()
-                kf.Visible = false
                 hideKF()
+                task.wait(0.1)
+                syncContent()
             end
-            blockVis = false
         end)
         
         -- Also hook toggle directly (more reliable)
@@ -557,19 +554,29 @@ local function ApplyMounxStyle(Library)
             if Library.Toggles and Library.Toggles.KeybindsToggle then
                 Library.Toggles.KeybindsToggle:OnChanged(function(v)
                     mxKB.Visible = v
-                    if v then syncContent() end
-                    task.defer(function()
-                        blockVis = true
-                        kf.Visible = false
+                    if v then
+                        task.wait(0.1)
                         hideKF()
-                        blockVis = false
-                    end)
+                        syncContent()
+                    end
                 end)
             end
         end)
         
-        -- Initial state
-        mxKB.Visible = false
+        -- Periodic sync: catch entries added/changed while panel is open
+        task.spawn(function()
+            while mxKB and mxKB.Parent do
+                task.wait(1)
+                if mxKB.Visible then
+                    hideKF()
+                    syncContent()
+                end
+            end
+        end)
+        
+        -- Initial state: mirror kf
+        mxKB.Visible = kf.Visible
+        if kf.Visible then syncContent() end
     end
 
     local function styleObj(obj)
