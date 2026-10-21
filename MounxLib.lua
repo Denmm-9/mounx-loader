@@ -288,8 +288,8 @@ local function ApplyMounxStyle(Library)
                 entry.BackgroundColor3 = isOdd and Color3.fromRGB(22, 18, 30) or Color3.fromRGB(26, 22, 36)
                 entry.BackgroundTransparency = 0
             else
-                entry.BackgroundColor3 = Color3.fromRGB(16, 14, 20)
-                entry.BackgroundTransparency = 0.3
+                entry.BackgroundColor3 = Color3.fromRGB(30, 26, 40)
+                entry.BackgroundTransparency = 0
             end
             
             -- Left accent bar (visible only when active)
@@ -307,8 +307,8 @@ local function ApplyMounxStyle(Library)
                 leftBar.BackgroundTransparency = 0
                 Library:AddToRegistry(leftBar, { BackgroundColor3 = "AccentColor" })
             else
-                leftBar.BackgroundColor3 = Color3.fromRGB(50, 45, 60)
-                leftBar.BackgroundTransparency = 0.5
+                leftBar.BackgroundColor3 = Color3.fromRGB(70, 62, 90)
+                leftBar.BackgroundTransparency = 0
             end
             
             -- Key badge
@@ -347,11 +347,11 @@ local function ApplyMounxStyle(Library)
                 Library:AddToRegistry(bStroke, { Color = "AccentColor" })
                 Library:AddToRegistry(keyText, { TextColor3 = "AccentColor" })
             else
-                badge.BackgroundColor3 = Color3.fromRGB(40, 36, 50)
-                badge.BackgroundTransparency = 0.4
-                bStroke.Transparency = 0.7
-                bStroke.Color = Color3.fromRGB(60, 55, 75)
-                keyText.TextColor3 = Color3.fromRGB(80, 75, 100)
+                badge.BackgroundColor3 = Color3.fromRGB(55, 48, 72)
+                badge.BackgroundTransparency = 0.1
+                bStroke.Transparency = 0.45
+                bStroke.Color = Color3.fromRGB(90, 80, 115)
+                keyText.TextColor3 = Color3.fromRGB(145, 135, 170)
             end
             
             -- Type tag pill (right side)
@@ -395,11 +395,11 @@ local function ApplyMounxStyle(Library)
                         Library:AddToRegistry(typeLabel, { TextColor3 = "AccentColor" })
                     end
                 else
-                    typeTag.BackgroundColor3 = Color3.fromRGB(28, 25, 36)
-                    typeTag.BackgroundTransparency = 0.4
-                    typeLabel.TextColor3 = Color3.fromRGB(65, 60, 80)
+                    typeTag.BackgroundColor3 = Color3.fromRGB(45, 40, 60)
+                    typeTag.BackgroundTransparency = 0
+                    typeLabel.TextColor3 = Color3.fromRGB(130, 120, 160)
                     if typeName == "Toggle" then
-                        typeLabel.Text = "Off"
+                        typeLabel.Text = "Toggle"
                     elseif typeName == "Hold" then
                         typeLabel.Text = "Hold"
                     else
@@ -425,7 +425,7 @@ local function ApplyMounxStyle(Library)
             if isActive then
                 actionLabel.TextColor3 = Color3.fromRGB(220, 215, 235)
             else
-                actionLabel.TextColor3 = Color3.fromRGB(85, 80, 105)
+                actionLabel.TextColor3 = Color3.fromRGB(155, 145, 180)
             end
             
             -- Active glow stroke on entry
@@ -464,8 +464,16 @@ local function ApplyMounxStyle(Library)
         local ACCENT = Library.AccentColor
 
         -- Gather all KeyPicker options from Library.Options
+        -- Filters out the menu keybind (should never appear in the panel)
         local function collectKPs()
             local list = {}
+            local menuKeyName = nil
+            pcall(function()
+                -- Detect menu key option name
+                if Library.MenuKeyOption then
+                    menuKeyName = Library.MenuKeyOption
+                end
+            end)
             pcall(function()
                 for optName, opt in pairs(Library.Options) do
                     pcall(function()
@@ -477,6 +485,12 @@ local function ApplyMounxStyle(Library)
                         end
                         if kp then
                             local keyVal = kp.Value
+                            local lowerName = optName:lower()
+                            -- Skip the menu keybind entirely
+                            local isMenuKey = lowerName:find("menu") ~= nil
+                                and (lowerName:find("key") ~= nil or lowerName:find("bind") ~= nil or lowerName:find("toggle") ~= nil)
+                            if isMenuKey then return end
+                            if menuKeyName and optName == menuKeyName then return end
                             if keyVal and tostring(keyVal) ~= "" and tostring(keyVal) ~= "None" and tostring(keyVal) ~= "Unknown" then
                                 table.insert(list, { kp = kp, optName = optName })
                             end
@@ -487,23 +501,30 @@ local function ApplyMounxStyle(Library)
             return list
         end
 
-        -- Resolve the active state of a KeyPicker robustly
+        -- Resolve the active state of a KeyPicker correctly per mode
         local function resolveActive(kp, optName)
             local mode = (kp.Mode or "Toggle")
+            -- Always mode: always shown as active
             if mode == "Always" then return true end
-            -- Try kp.Toggled first (Hold mode sets this while key is held)
+            -- Hold mode: ONLY active while the key is physically held (kp.Toggled = true during hold)
+            -- Do NOT check Library.Toggles for Hold — that would show wrong state
+            if mode == "Hold" then
+                return kp.Toggled == true
+            end
+            -- Toggle mode: check kp.Toggled first, then find the linked toggle
             if kp.Toggled == true then return true end
-            -- Try the linked Toggle by stripping "Key" suffix and looking in Toggles
             local linkedName = optName:gsub("Key$", ""):gsub("Keybind$", ""):gsub("KB$", "")
             if Library.Toggles then
-                -- Exact match
+                -- Exact match on stripped name
                 if Library.Toggles[linkedName] and Library.Toggles[linkedName].Value == true then
                     return true
                 end
-                -- Prefix match: e.g. "SpeedKey" -> find "Speed..." toggle
+                -- Prefix match: "SpeedKey" -> find toggle whose name is inside optName
                 for tName, tog in pairs(Library.Toggles) do
-                    if optName:find(tName, 1, true) or tName:find(linkedName, 1, true) then
-                        if tog.Value == true then return true end
+                    if tName ~= "" and linkedName ~= "" then
+                        if optName:find(tName, 1, true) or tName:find(linkedName, 1, true) then
+                            if tog.Value == true then return true end
+                        end
                     end
                 end
             end
@@ -522,8 +543,8 @@ local function ApplyMounxStyle(Library)
                     }):Play()
                 else
                     TweenService:Create(entry, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                        BackgroundColor3 = Color3.fromRGB(16, 14, 20),
-                        BackgroundTransparency = 0.3
+                        BackgroundColor3 = Color3.fromRGB(30, 26, 40),
+                        BackgroundTransparency = 0
                     }):Play()
                 end
 
@@ -536,8 +557,8 @@ local function ApplyMounxStyle(Library)
                         }):Play()
                     else
                         TweenService:Create(leftBar, TweenInfo.new(0.18), {
-                            BackgroundColor3 = Color3.fromRGB(50, 45, 60),
-                            BackgroundTransparency = 0.5
+                            BackgroundColor3 = Color3.fromRGB(70, 62, 90),
+                            BackgroundTransparency = 0
                         }):Play()
                     end
                 end
@@ -563,17 +584,17 @@ local function ApplyMounxStyle(Library)
                         end
                     else
                         TweenService:Create(badge, TweenInfo.new(0.18), {
-                            BackgroundColor3 = Color3.fromRGB(40, 36, 50),
-                            BackgroundTransparency = 0.4
+                            BackgroundColor3 = Color3.fromRGB(55, 48, 72),
+                            BackgroundTransparency = 0.1
                         }):Play()
                         if stroke then
                             TweenService:Create(stroke, TweenInfo.new(0.18), {
-                                Color = Color3.fromRGB(60, 55, 75), Transparency = 0.7
+                                Color = Color3.fromRGB(90, 80, 115), Transparency = 0.45
                             }):Play()
                         end
                         if keyTxt then
                             TweenService:Create(keyTxt, TweenInfo.new(0.18), {
-                                TextColor3 = Color3.fromRGB(80, 75, 100)
+                                TextColor3 = Color3.fromRGB(145, 135, 170)
                             }):Play()
                         end
                     end
@@ -619,14 +640,14 @@ local function ApplyMounxStyle(Library)
                         end
                     else
                         TweenService:Create(typeTag, TweenInfo.new(0.18), {
-                            BackgroundColor3 = Color3.fromRGB(28, 25, 36),
-                            BackgroundTransparency = 0.4
+                            BackgroundColor3 = Color3.fromRGB(45, 40, 60),
+                            BackgroundTransparency = 0
                         }):Play()
                         if typeLbl then
                             TweenService:Create(typeLbl, TweenInfo.new(0.18), {
-                                TextColor3 = Color3.fromRGB(65, 60, 80)
+                                TextColor3 = Color3.fromRGB(130, 120, 160)
                             }):Play()
-                            if mode == "Toggle" then typeLbl.Text = "Off"
+                            if mode == "Toggle" then typeLbl.Text = "Toggle"
                             elseif mode == "Hold" then typeLbl.Text = "Hold"
                             end
                         end
@@ -641,7 +662,7 @@ local function ApplyMounxStyle(Library)
                         }):Play()
                     else
                         TweenService:Create(actionLbl, TweenInfo.new(0.18), {
-                            TextColor3 = Color3.fromRGB(85, 80, 105)
+                            TextColor3 = Color3.fromRGB(155, 145, 180)
                         }):Play()
                     end
                 end
