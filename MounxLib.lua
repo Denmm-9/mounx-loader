@@ -451,13 +451,47 @@ local function ApplyMounxStyle(Library)
                 if child:IsA("TextLabel") then kfTitle = child; break end
             end
             
-            -- Build entries from kf's text labels
-            local idx = 0
+            -- Collect keybind entries from kf (search deep with GetDescendants)
+            local entries = {}
+            
+            -- Strategy 1: direct TextLabel children
             for _, child in ipairs(kf:GetChildren()) do
                 if child:IsA("TextLabel") and child ~= kfTitle and child.Text ~= "" then
-                    idx = idx + 1
-                    createEntry(child.Text, idx)
+                    table.insert(entries, child.Text)
                 end
+            end
+            
+            -- Strategy 2: if none found, search ALL descendants for [KEY] pattern
+            if #entries == 0 then
+                for _, desc in ipairs(kf:GetDescendants()) do
+                    if desc:IsA("TextLabel") and desc ~= kfTitle and desc.Text:match("%[.-%]") then
+                        table.insert(entries, desc.Text)
+                    end
+                end
+            end
+            
+            -- Strategy 3: if still none, read from Library's internal keybind options
+            if #entries == 0 then
+                pcall(function()
+                    for optName, opt in pairs(Library.Options) do
+                        if opt and opt.KeyPicker and opt.Value then
+                            local kp = opt.KeyPicker
+                            local keyVal = kp.Value or opt.Value
+                            local mode = kp.Mode or "Toggle"
+                            local label = kp.Text or opt.Text or optName
+                            if keyVal and tostring(keyVal) ~= "" and tostring(keyVal) ~= "None" and tostring(keyVal) ~= "Unknown" then
+                                table.insert(entries, "[" .. tostring(keyVal) .. "] " .. tostring(label) .. " (" .. tostring(mode) .. ")")
+                            end
+                        end
+                    end
+                end)
+            end
+            
+            -- Build entries in custom panel
+            local idx = 0
+            for _, text in ipairs(entries) do
+                idx = idx + 1
+                createEntry(text, idx)
             end
             
             -- Empty state
@@ -484,16 +518,18 @@ local function ApplyMounxStyle(Library)
         local function hideKF()
             kf.BackgroundTransparency = 1
             kf.BorderSizePixel = 0
-            for _, child in ipairs(kf:GetChildren()) do
+            for _, desc in ipairs(kf:GetDescendants()) do
                 pcall(function()
-                    if child:IsA("TextLabel") then
-                        child.TextTransparency = 1
-                        child.BackgroundTransparency = 1
-                    elseif child:IsA("Frame") then
-                        child.BackgroundTransparency = 1
-                        child.Visible = false
-                    elseif child:IsA("UIStroke") then
-                        child.Transparency = 1
+                    if desc:IsA("TextLabel") then
+                        desc.TextTransparency = 1
+                        desc.BackgroundTransparency = 1
+                    elseif desc:IsA("Frame") then
+                        desc.BackgroundTransparency = 1
+                    elseif desc:IsA("UIStroke") then
+                        desc.Transparency = 1
+                    elseif desc:IsA("ImageLabel") then
+                        desc.ImageTransparency = 1
+                        desc.BackgroundTransparency = 1
                     end
                 end)
             end
@@ -507,7 +543,7 @@ local function ApplyMounxStyle(Library)
         
         -- Hide new children in kf + sync data
         kf.ChildAdded:Connect(function(child)
-            task.wait(0.03)
+            task.wait(0.05)
             pcall(function()
                 if child:IsA("TextLabel") then
                     child.TextTransparency = 1
@@ -516,7 +552,18 @@ local function ApplyMounxStyle(Library)
                         if child.TextTransparency < 1 then child.TextTransparency = 1 end
                     end)
                 elseif child:IsA("Frame") then
-                    child.Visible = false
+                    child.BackgroundTransparency = 1
+                    -- Also hide any nested TextLabels/images inside
+                    for _, desc in ipairs(child:GetDescendants()) do
+                        pcall(function()
+                            if desc:IsA("TextLabel") then
+                                desc.TextTransparency = 1
+                                desc.BackgroundTransparency = 1
+                            elseif desc:IsA("ImageLabel") then
+                                desc.ImageTransparency = 1
+                            end
+                        end)
+                    end
                 end
             end)
             if mxKB.Visible then syncContent() end
@@ -525,6 +572,31 @@ local function ApplyMounxStyle(Library)
         kf.ChildRemoved:Connect(function()
             task.wait(0.05)
             if mxKB.Visible then syncContent() end
+        end)
+        
+        -- Also catch descendants being added/removed (for nested structures)
+        kf.DescendantAdded:Connect(function(desc)
+            task.wait(0.05)
+            pcall(function()
+                if desc:IsA("TextLabel") then
+                    desc.TextTransparency = 1
+                    desc.BackgroundTransparency = 1
+                    desc:GetPropertyChangedSignal("TextTransparency"):Connect(function()
+                        if desc.TextTransparency < 1 then desc.TextTransparency = 1 end
+                    end)
+                elseif desc:IsA("Frame") then
+                    desc.BackgroundTransparency = 1
+                elseif desc:IsA("ImageLabel") then
+                    desc.ImageTransparency = 1
+                end
+            end)
+            if mxKB.Visible then syncContent() end
+        end)
+        
+        kf.DescendantRemoving:Connect(function()
+            task.delay(0.1, function()
+                if mxKB.Visible then syncContent() end
+            end)
         end)
         
         -- Also block text showing on existing children
