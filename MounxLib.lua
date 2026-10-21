@@ -690,6 +690,8 @@ local function ApplyMounxStyle(Library)
         -- Live entry map: optName -> frame (persists across state updates)
         local liveEntries = {}
         local kpConnections = {}
+        -- Tracks Hold keybinds for fast polling: { optName = { kp=kp } }
+        local holdEntries = {}
 
         local function buildEntries()
             -- Clear removed entries
@@ -712,8 +714,11 @@ local function ApplyMounxStyle(Library)
                 seen[oName] = true
 
                 if liveEntries[oName] and liveEntries[oName].Parent then
-                    -- Entry exists — just update state (smooth tween, no flicker)
-                    applyEntryState(liveEntries[oName], isActive)
+                    -- Entry exists — just update state for Toggle/Always modes
+                    -- Hold mode is handled by its own fast loop, skip here to avoid lag
+                    if mode ~= "Hold" then
+                        applyEntryState(liveEntries[oName], isActive)
+                    end
                     -- Update key text in case key changed
                     local badge = liveEntries[oName]:FindFirstChild("KeyBadge")
                     if badge then
@@ -726,26 +731,27 @@ local function ApplyMounxStyle(Library)
                     frame:SetAttribute("Mode", mode)
                     liveEntries[oName] = frame
 
-                    -- Hook the linked toggle for instant visual response
+                    -- Register Hold entries for fast polling
+                    if mode == "Hold" then
+                        holdEntries[oName] = { kp = kp }
+                    end
+
+                    -- Hook the linked Toggle for instant visual response (Toggle mode)
                     if not kpConnections[oName] then
                         kpConnections[oName] = true
-                        -- Try hooking the KeyPicker's own toggle signal
-                        pcall(function()
-                            kp:GetPropertyChangedSignal("Toggled"):Connect(function()
-                                local active = resolveActive(kp, oName)
-                                applyEntryState(liveEntries[oName], active)
+                        if mode ~= "Hold" then
+                            pcall(function()
+                                local linkedName = oName:gsub("Key$",""):gsub("Keybind$",""):gsub("KB$","")
+                                if Library.Toggles and Library.Toggles[linkedName] then
+                                    Library.Toggles[linkedName]:OnChanged(function()
+                                        task.wait()
+                                        if liveEntries[oName] then
+                                            applyEntryState(liveEntries[oName], resolveActive(kp, oName))
+                                        end
+                                    end)
+                                end
                             end)
-                        end)
-                        -- Also hook the linked Toggle in Library.Toggles
-                        pcall(function()
-                            local linkedName = oName:gsub("Key$",""):gsub("Keybind$",""):gsub("KB$","")
-                            if Library.Toggles and Library.Toggles[linkedName] then
-                                Library.Toggles[linkedName]:OnChanged(function()
-                                    task.wait()
-                                    applyEntryState(liveEntries[oName], resolveActive(kp, oName))
-                                end)
-                            end
-                        end)
+                        end
                     end
                 end
             end
@@ -755,6 +761,7 @@ local function ApplyMounxStyle(Library)
                 if not seen[name] then
                     if frame and frame.Parent then frame:Destroy() end
                     liveEntries[name] = nil
+                    holdEntries[name] = nil
                 end
             end
 
@@ -785,6 +792,29 @@ local function ApplyMounxStyle(Library)
         local function syncContent()
             buildEntries()
         end
+
+        -- Fast Hold-mode state loop (runs at ~20fps, much faster than the 0.3s general loop)
+        -- Watches kp.Toggled which is a Lua field (not an Instance property),
+        -- so GetPropertyChangedSignal won't work — we must poll it.
+        task.spawn(function()
+            local lastState = {}
+            while mxKB and mxKB.Parent do
+                task.wait(0.05)
+                if mxKB.Visible then
+                    for oName, data in pairs(holdEntries) do
+                        local kp = data.kp
+                        local entry = liveEntries[oName]
+                        if entry and entry.Parent then
+                            local isActive = kp.Toggled == true
+                            if lastState[oName] ~= isActive then
+                                lastState[oName] = isActive
+                                applyEntryState(entry, isActive)
+                            end
+                        end
+                    end
+                end
+            end
+        end)
         
         -- ======================
         -- VISIBILITY & DATA SYNC
