@@ -268,15 +268,13 @@ local function ApplyMounxStyle(Library)
         sepGrad.Parent = sep
         
         -- ======================
-        -- ENTRY BUILDER
+        -- ENTRY BUILDER (with active/inactive state)
         -- ======================
-        local function createEntry(text, order)
+        local function createEntry(keyStr, actionName, typeName, isActive, order)
             local isOdd = (order % 2 == 1)
             
             local entry = Instance.new("Frame")
             entry.Name = "KBEntry"
-            entry.BackgroundColor3 = isOdd and Color3.fromRGB(20, 17, 26) or Color3.fromRGB(24, 20, 32)
-            entry.BackgroundTransparency = 0.05
             entry.BorderSizePixel = 0
             entry.Size = UDim2.new(1, 0, 0, 26)
             entry.LayoutOrder = order + 10
@@ -285,67 +283,76 @@ local function ApplyMounxStyle(Library)
             entry:SetAttribute("IsEntry", true)
             addCorner(entry, 6)
             
-            -- Left accent bar
+            -- Colors based on state
+            if isActive then
+                entry.BackgroundColor3 = isOdd and Color3.fromRGB(22, 18, 30) or Color3.fromRGB(26, 22, 36)
+                entry.BackgroundTransparency = 0
+            else
+                entry.BackgroundColor3 = Color3.fromRGB(16, 14, 20)
+                entry.BackgroundTransparency = 0.3
+            end
+            
+            -- Left accent bar (visible only when active)
             local leftBar = Instance.new("Frame")
             leftBar.Name = "LeftBar"
-            leftBar.BackgroundColor3 = Library.AccentColor
             leftBar.BorderSizePixel = 0
             leftBar.Size = UDim2.new(0, 2, 0.5, 0)
             leftBar.Position = UDim2.new(0, 3, 0.25, 0)
             leftBar.ZIndex = entry.ZIndex + 1
             leftBar.Parent = entry
             addCorner(leftBar, 2)
-            Library:AddToRegistry(leftBar, { BackgroundColor3 = "AccentColor" })
             
-            -- Parse: "  [KEY] Action Name (Type)"
-            local keyStr = text:match("%[(.-)%]") or "?"
-            local afterKey = text:match("%]%s*(.+)") or text
-            local typeName = ""
-            local actionName = afterKey
-            
-            local typeMatch = afterKey:match("%((.-)%)%s*$")
-            if typeMatch then
-                typeName = typeMatch
-                -- Escape special pattern chars for gsub
-                local escaped = typeMatch:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1")
-                actionName = afterKey:gsub("%s*%(" .. escaped .. "%)%s*$", "")
+            if isActive then
+                leftBar.BackgroundColor3 = Library.AccentColor
+                leftBar.BackgroundTransparency = 0
+                Library:AddToRegistry(leftBar, { BackgroundColor3 = "AccentColor" })
+            else
+                leftBar.BackgroundColor3 = Color3.fromRGB(50, 45, 60)
+                leftBar.BackgroundTransparency = 0.5
             end
-            actionName = actionName:match("^%s*(.-)%s*$") or actionName
             
-            -- Key badge (accent-tinted pill)
+            -- Key badge
             local badgeW = math.max(22, #keyStr * 8 + 12)
             local badge = Instance.new("Frame")
             badge.Name = "KeyBadge"
-            badge.BackgroundColor3 = Library.AccentColor
-            badge.BackgroundTransparency = 0.82
             badge.BorderSizePixel = 0
             badge.Size = UDim2.new(0, badgeW, 0, 16)
             badge.Position = UDim2.new(0, 10, 0.5, -8)
             badge.ZIndex = entry.ZIndex + 2
             badge.Parent = entry
             addCorner(badge, 4)
-            Library:AddToRegistry(badge, { BackgroundColor3 = "AccentColor" })
             
-            -- Badge border stroke
             local bStroke = Instance.new("UIStroke")
             bStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
             bStroke.Thickness = 1
-            bStroke.Transparency = 0.5
             bStroke.Parent = badge
-            Library:AddToRegistry(bStroke, { Color = "AccentColor" })
             
-            -- Key letter inside badge
             local keyText = Instance.new("TextLabel")
             keyText.Name = "KeyText"
             keyText.BackgroundTransparency = 1
             keyText.Size = UDim2.new(1, 0, 1, 0)
             keyText.Font = Enum.Font.GothamBold
             keyText.TextSize = 9
-            keyText.TextColor3 = Library.AccentColor
             keyText.Text = keyStr
             keyText.ZIndex = entry.ZIndex + 3
             keyText.Parent = badge
-            Library:AddToRegistry(keyText, { TextColor3 = "AccentColor" })
+            
+            if isActive then
+                badge.BackgroundColor3 = Library.AccentColor
+                badge.BackgroundTransparency = 0.78
+                bStroke.Transparency = 0.4
+                bStroke.Color = Library.AccentColor
+                keyText.TextColor3 = Library.AccentColor
+                Library:AddToRegistry(badge, { BackgroundColor3 = "AccentColor" })
+                Library:AddToRegistry(bStroke, { Color = "AccentColor" })
+                Library:AddToRegistry(keyText, { TextColor3 = "AccentColor" })
+            else
+                badge.BackgroundColor3 = Color3.fromRGB(40, 36, 50)
+                badge.BackgroundTransparency = 0.4
+                bStroke.Transparency = 0.7
+                bStroke.Color = Color3.fromRGB(60, 55, 75)
+                keyText.TextColor3 = Color3.fromRGB(80, 75, 100)
+            end
             
             -- Type tag pill (right side)
             local typeTagW = 0
@@ -368,25 +375,40 @@ local function ApplyMounxStyle(Library)
                 typeLabel.ZIndex = entry.ZIndex + 3
                 typeLabel.Parent = typeTag
                 
-                if typeName == "Toggle" then
-                    typeTag.BackgroundColor3 = Color3.fromRGB(25, 40, 30)
-                    typeTag.BackgroundTransparency = 0.25
-                    typeLabel.TextColor3 = Color3.fromRGB(75, 170, 100)
-                    typeLabel.Text = "Toggle"
-                elseif typeName == "Hold" then
-                    typeTag.BackgroundColor3 = Color3.fromRGB(40, 30, 20)
-                    typeTag.BackgroundTransparency = 0.25
-                    typeLabel.TextColor3 = Color3.fromRGB(200, 150, 60)
-                    typeLabel.Text = "Hold"
+                if isActive then
+                    if typeName == "Toggle" then
+                        typeTag.BackgroundColor3 = Color3.fromRGB(25, 45, 30)
+                        typeTag.BackgroundTransparency = 0.15
+                        typeLabel.TextColor3 = Color3.fromRGB(80, 200, 115)
+                        typeLabel.Text = "ON"
+                    elseif typeName == "Hold" then
+                        typeTag.BackgroundColor3 = Color3.fromRGB(45, 35, 18)
+                        typeTag.BackgroundTransparency = 0.15
+                        typeLabel.TextColor3 = Color3.fromRGB(220, 170, 60)
+                        typeLabel.Text = "Held"
+                    else
+                        typeTag.BackgroundColor3 = Library.AccentColor
+                        typeTag.BackgroundTransparency = 0.8
+                        typeLabel.TextColor3 = Library.AccentColor
+                        typeLabel.Text = typeName
+                        Library:AddToRegistry(typeTag, { BackgroundColor3 = "AccentColor" })
+                        Library:AddToRegistry(typeLabel, { TextColor3 = "AccentColor" })
+                    end
                 else
-                    typeTag.BackgroundColor3 = Color3.fromRGB(30, 26, 40)
-                    typeTag.BackgroundTransparency = 0.25
-                    typeLabel.TextColor3 = Color3.fromRGB(120, 115, 145)
-                    typeLabel.Text = typeName
+                    typeTag.BackgroundColor3 = Color3.fromRGB(28, 25, 36)
+                    typeTag.BackgroundTransparency = 0.4
+                    typeLabel.TextColor3 = Color3.fromRGB(65, 60, 80)
+                    if typeName == "Toggle" then
+                        typeLabel.Text = "Off"
+                    elseif typeName == "Hold" then
+                        typeLabel.Text = "Hold"
+                    else
+                        typeLabel.Text = typeName
+                    end
                 end
             end
             
-            -- Action name (center text)
+            -- Action name
             local actionLabel = Instance.new("TextLabel")
             actionLabel.Name = "ActionText"
             actionLabel.BackgroundTransparency = 1
@@ -394,14 +416,30 @@ local function ApplyMounxStyle(Library)
             actionLabel.Position = UDim2.new(0, badgeW + 16, 0, 0)
             actionLabel.Font = Enum.Font.GothamMedium
             actionLabel.TextSize = 10
-            actionLabel.TextColor3 = Color3.fromRGB(195, 190, 212)
             actionLabel.TextXAlignment = Enum.TextXAlignment.Left
             actionLabel.TextTruncate = Enum.TextTruncate.AtEnd
             actionLabel.Text = actionName
             actionLabel.ZIndex = entry.ZIndex + 3
             actionLabel.Parent = entry
             
-            -- Hover glow effect
+            if isActive then
+                actionLabel.TextColor3 = Color3.fromRGB(220, 215, 235)
+            else
+                actionLabel.TextColor3 = Color3.fromRGB(85, 80, 105)
+            end
+            
+            -- Active glow stroke on entry
+            if isActive then
+                local activeGlow = Instance.new("UIStroke")
+                activeGlow.Name = "ActiveGlow"
+                activeGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                activeGlow.Thickness = 1
+                activeGlow.Transparency = 0.6
+                activeGlow.Parent = entry
+                Library:AddToRegistry(activeGlow, { Color = "AccentColor" })
+            end
+            
+            -- Hover effect
             local hGlow = Instance.new("UIStroke")
             hGlow.Name = "HoverGlow"
             hGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -411,102 +449,320 @@ local function ApplyMounxStyle(Library)
             Library:AddToRegistry(hGlow, { Color = "AccentColor" })
             
             entry.MouseEnter:Connect(function()
-                TweenService:Create(hGlow, TweenInfo.new(0.12), {Transparency = 0.35}):Play()
-                TweenService:Create(entry, TweenInfo.new(0.12), {BackgroundTransparency = 0}):Play()
+                TweenService:Create(hGlow, TweenInfo.new(0.12), {Transparency = 0.3}):Play()
             end)
             entry.MouseLeave:Connect(function()
                 TweenService:Create(hGlow, TweenInfo.new(0.2), {Transparency = 1}):Play()
-                TweenService:Create(entry, TweenInfo.new(0.2), {BackgroundTransparency = 0.05}):Play()
             end)
             
             return entry
         end
         
         -- ======================
-        -- SYNC ENGINE
+        -- SYNC ENGINE v2 — live entry table, in-place state updates
         -- ======================
-        local function syncContent()
-            -- Remove old entries
-            for _, child in ipairs(content:GetChildren()) do
-                if child:GetAttribute("IsEntry") then child:Destroy() end
-            end
-            
-            -- Find title in kf to skip it
-            local kfTitle = nil
-            for _, child in ipairs(kf:GetChildren()) do
-                if child:IsA("TextLabel") then kfTitle = child; break end
-            end
-            
-            -- Collect keybind entries from kf (search deep with GetDescendants)
-            local entries = {}
-            
-            -- Strategy 1: direct TextLabel children
-            for _, child in ipairs(kf:GetChildren()) do
-                if child:IsA("TextLabel") and child ~= kfTitle and child.Text ~= "" then
-                    table.insert(entries, child.Text)
+        local ACCENT = Library.AccentColor
+
+        -- Gather all KeyPicker options from Library.Options
+        local function collectKPs()
+            local list = {}
+            pcall(function()
+                for optName, opt in pairs(Library.Options) do
+                    pcall(function()
+                        local kp = nil
+                        if opt and opt.Type == "KeyPicker" then
+                            kp = opt
+                        elseif opt and opt.KeyPicker then
+                            kp = opt.KeyPicker
+                        end
+                        if kp then
+                            local keyVal = kp.Value
+                            if keyVal and tostring(keyVal) ~= "" and tostring(keyVal) ~= "None" and tostring(keyVal) ~= "Unknown" then
+                                table.insert(list, { kp = kp, optName = optName })
+                            end
+                        end
+                    end)
                 end
-            end
-            
-            -- Strategy 2: if none found, search ALL descendants for [KEY] pattern
-            if #entries == 0 then
-                for _, desc in ipairs(kf:GetDescendants()) do
-                    if desc:IsA("TextLabel") and desc ~= kfTitle and desc.Text:match("%[.-%]") then
-                        table.insert(entries, desc.Text)
+            end)
+            return list
+        end
+
+        -- Resolve the active state of a KeyPicker robustly
+        local function resolveActive(kp, optName)
+            local mode = (kp.Mode or "Toggle")
+            if mode == "Always" then return true end
+            -- Try kp.Toggled first (Hold mode sets this while key is held)
+            if kp.Toggled == true then return true end
+            -- Try the linked Toggle by stripping "Key" suffix and looking in Toggles
+            local linkedName = optName:gsub("Key$", ""):gsub("Keybind$", ""):gsub("KB$", "")
+            if Library.Toggles then
+                -- Exact match
+                if Library.Toggles[linkedName] and Library.Toggles[linkedName].Value == true then
+                    return true
+                end
+                -- Prefix match: e.g. "SpeedKey" -> find "Speed..." toggle
+                for tName, tog in pairs(Library.Toggles) do
+                    if optName:find(tName, 1, true) or tName:find(linkedName, 1, true) then
+                        if tog.Value == true then return true end
                     end
                 end
             end
-            
-            -- Strategy 3: if still none, read from Library's internal keybind options (ONLY active ones)
-            if #entries == 0 then
-                pcall(function()
-                    for optName, opt in pairs(Library.Options) do
+            return false
+        end
+
+        -- Apply visual state to an existing entry frame IN-PLACE (no destroy/recreate)
+        local function applyEntryState(entry, isActive)
+            if not entry or not entry.Parent then return end
+            pcall(function()
+                -- Background
+                if isActive then
+                    TweenService:Create(entry, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                        BackgroundColor3 = Color3.fromRGB(26, 20, 36),
+                        BackgroundTransparency = 0
+                    }):Play()
+                else
+                    TweenService:Create(entry, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                        BackgroundColor3 = Color3.fromRGB(16, 14, 20),
+                        BackgroundTransparency = 0.3
+                    }):Play()
+                end
+
+                local leftBar = entry:FindFirstChild("LeftBar")
+                if leftBar then
+                    if isActive then
+                        TweenService:Create(leftBar, TweenInfo.new(0.18), {
+                            BackgroundColor3 = ACCENT,
+                            BackgroundTransparency = 0
+                        }):Play()
+                    else
+                        TweenService:Create(leftBar, TweenInfo.new(0.18), {
+                            BackgroundColor3 = Color3.fromRGB(50, 45, 60),
+                            BackgroundTransparency = 0.5
+                        }):Play()
+                    end
+                end
+
+                local badge = entry:FindFirstChild("KeyBadge")
+                if badge then
+                    local stroke = badge:FindFirstChildOfClass("UIStroke")
+                    local keyTxt = badge:FindFirstChild("KeyText")
+                    if isActive then
+                        TweenService:Create(badge, TweenInfo.new(0.18), {
+                            BackgroundColor3 = ACCENT,
+                            BackgroundTransparency = 0.78
+                        }):Play()
+                        if stroke then
+                            TweenService:Create(stroke, TweenInfo.new(0.18), {
+                                Color = ACCENT, Transparency = 0.4
+                            }):Play()
+                        end
+                        if keyTxt then
+                            TweenService:Create(keyTxt, TweenInfo.new(0.18), {
+                                TextColor3 = ACCENT
+                            }):Play()
+                        end
+                    else
+                        TweenService:Create(badge, TweenInfo.new(0.18), {
+                            BackgroundColor3 = Color3.fromRGB(40, 36, 50),
+                            BackgroundTransparency = 0.4
+                        }):Play()
+                        if stroke then
+                            TweenService:Create(stroke, TweenInfo.new(0.18), {
+                                Color = Color3.fromRGB(60, 55, 75), Transparency = 0.7
+                            }):Play()
+                        end
+                        if keyTxt then
+                            TweenService:Create(keyTxt, TweenInfo.new(0.18), {
+                                TextColor3 = Color3.fromRGB(80, 75, 100)
+                            }):Play()
+                        end
+                    end
+                end
+
+                local typeTag = entry:FindFirstChild("TypeTag")
+                if typeTag then
+                    local typeLbl = typeTag:FindFirstChildOfClass("TextLabel")
+                    local mode = entry:GetAttribute("Mode") or "Toggle"
+                    if isActive then
+                        if mode == "Toggle" then
+                            TweenService:Create(typeTag, TweenInfo.new(0.18), {
+                                BackgroundColor3 = Color3.fromRGB(25, 45, 30),
+                                BackgroundTransparency = 0.15
+                            }):Play()
+                            if typeLbl then
+                                TweenService:Create(typeLbl, TweenInfo.new(0.18), {
+                                    TextColor3 = Color3.fromRGB(80, 200, 115)
+                                }):Play()
+                                typeLbl.Text = "ON"
+                            end
+                        elseif mode == "Hold" then
+                            TweenService:Create(typeTag, TweenInfo.new(0.18), {
+                                BackgroundColor3 = Color3.fromRGB(45, 35, 18),
+                                BackgroundTransparency = 0.15
+                            }):Play()
+                            if typeLbl then
+                                TweenService:Create(typeLbl, TweenInfo.new(0.18), {
+                                    TextColor3 = Color3.fromRGB(220, 170, 60)
+                                }):Play()
+                                typeLbl.Text = "Held"
+                            end
+                        else
+                            TweenService:Create(typeTag, TweenInfo.new(0.18), {
+                                BackgroundColor3 = ACCENT,
+                                BackgroundTransparency = 0.8
+                            }):Play()
+                            if typeLbl then
+                                TweenService:Create(typeLbl, TweenInfo.new(0.18), {
+                                    TextColor3 = ACCENT
+                                }):Play()
+                            end
+                        end
+                    else
+                        TweenService:Create(typeTag, TweenInfo.new(0.18), {
+                            BackgroundColor3 = Color3.fromRGB(28, 25, 36),
+                            BackgroundTransparency = 0.4
+                        }):Play()
+                        if typeLbl then
+                            TweenService:Create(typeLbl, TweenInfo.new(0.18), {
+                                TextColor3 = Color3.fromRGB(65, 60, 80)
+                            }):Play()
+                            if mode == "Toggle" then typeLbl.Text = "Off"
+                            elseif mode == "Hold" then typeLbl.Text = "Hold"
+                            end
+                        end
+                    end
+                end
+
+                local actionLbl = entry:FindFirstChild("ActionText")
+                if actionLbl then
+                    if isActive then
+                        TweenService:Create(actionLbl, TweenInfo.new(0.18), {
+                            TextColor3 = Color3.fromRGB(220, 215, 235)
+                        }):Play()
+                    else
+                        TweenService:Create(actionLbl, TweenInfo.new(0.18), {
+                            TextColor3 = Color3.fromRGB(85, 80, 105)
+                        }):Play()
+                    end
+                end
+
+                local activeGlow = entry:FindFirstChild("ActiveGlow")
+                if isActive then
+                    if not activeGlow then
+                        activeGlow = Instance.new("UIStroke")
+                        activeGlow.Name = "ActiveGlow"
+                        activeGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                        activeGlow.Thickness = 1
+                        activeGlow.Transparency = 1
+                        activeGlow.Color = ACCENT
+                        activeGlow.Parent = entry
+                    end
+                    TweenService:Create(activeGlow, TweenInfo.new(0.18), { Transparency = 0.6 }):Play()
+                else
+                    if activeGlow then
+                        TweenService:Create(activeGlow, TweenInfo.new(0.18), { Transparency = 1 }):Play()
+                    end
+                end
+            end)
+        end
+
+        -- Live entry map: optName -> frame (persists across state updates)
+        local liveEntries = {}
+        local kpConnections = {}
+
+        local function buildEntries()
+            -- Clear removed entries
+            for name, frame in pairs(liveEntries) do
+                if not frame or not frame.Parent then
+                    liveEntries[name] = nil
+                end
+            end
+
+            local kps = collectKPs()
+            local seen = {}
+
+            for i, item in ipairs(kps) do
+                local kp = item.kp
+                local oName = item.optName
+                local keyVal = tostring(kp.Value)
+                local mode = kp.Mode or "Toggle"
+                local label = kp.Text or oName
+                local isActive = resolveActive(kp, oName)
+                seen[oName] = true
+
+                if liveEntries[oName] and liveEntries[oName].Parent then
+                    -- Entry exists — just update state (smooth tween, no flicker)
+                    applyEntryState(liveEntries[oName], isActive)
+                    -- Update key text in case key changed
+                    local badge = liveEntries[oName]:FindFirstChild("KeyBadge")
+                    if badge then
+                        local kt = badge:FindFirstChild("KeyText")
+                        if kt then kt.Text = keyVal end
+                    end
+                else
+                    -- New entry — create it
+                    local frame = createEntry(keyVal, label, mode, isActive, i)
+                    frame:SetAttribute("Mode", mode)
+                    liveEntries[oName] = frame
+
+                    -- Hook the linked toggle for instant visual response
+                    if not kpConnections[oName] then
+                        kpConnections[oName] = true
+                        -- Try hooking the KeyPicker's own toggle signal
                         pcall(function()
-                            -- Check if this is a KeyPicker
-                            if opt and (opt.Type == "KeyPicker" or (opt.KeyPicker)) then
-                                local kp = opt.Type == "KeyPicker" and opt or opt.KeyPicker
-                                local keyVal = kp.Value
-                                local mode = kp.Mode or "Toggle"
-                                local label = kp.Text or optName
-                                local isActive = false
-                                
-                                -- Only show if keybind is currently active
-                                if mode == "Always" then
-                                    isActive = true
-                                elseif kp.Toggled then
-                                    isActive = true
-                                end
-                                
-                                if isActive and keyVal and tostring(keyVal) ~= "" and tostring(keyVal) ~= "None" and tostring(keyVal) ~= "Unknown" then
-                                    table.insert(entries, "[" .. tostring(keyVal) .. "] " .. tostring(label) .. " (" .. tostring(mode) .. ")")
-                                end
+                            kp:GetPropertyChangedSignal("Toggled"):Connect(function()
+                                local active = resolveActive(kp, oName)
+                                applyEntryState(liveEntries[oName], active)
+                            end)
+                        end)
+                        -- Also hook the linked Toggle in Library.Toggles
+                        pcall(function()
+                            local linkedName = oName:gsub("Key$",""):gsub("Keybind$",""):gsub("KB$","")
+                            if Library.Toggles and Library.Toggles[linkedName] then
+                                Library.Toggles[linkedName]:OnChanged(function()
+                                    task.wait()
+                                    applyEntryState(liveEntries[oName], resolveActive(kp, oName))
+                                end)
                             end
                         end)
                     end
-                end)
+                end
             end
-            
-            -- Build entries in custom panel
-            local idx = 0
-            for _, text in ipairs(entries) do
-                idx = idx + 1
-                createEntry(text, idx)
+
+            -- Remove stale entries no longer in kps
+            for name, frame in pairs(liveEntries) do
+                if not seen[name] then
+                    if frame and frame.Parent then frame:Destroy() end
+                    liveEntries[name] = nil
+                end
             end
-            
+
             -- Empty state
-            if idx == 0 then
-                local empty = Instance.new("TextLabel")
-                empty.Name = "EmptyState"
-                empty.BackgroundTransparency = 1
-                empty.Size = UDim2.new(1, 0, 0, 22)
-                empty.LayoutOrder = 11
-                empty.Font = Enum.Font.Gotham
-                empty.TextSize = 9
-                empty.TextColor3 = Color3.fromRGB(80, 75, 100)
-                empty.Text = "No active keybinds"
-                empty.ZIndex = content.ZIndex + 2
-                empty.Parent = content
-                empty:SetAttribute("IsEntry", true)
+            local hasEntries = false
+            for _ in pairs(liveEntries) do hasEntries = true; break end
+            local emptyLbl = content:FindFirstChild("EmptyState")
+            if not hasEntries then
+                if not emptyLbl then
+                    local empty = Instance.new("TextLabel")
+                    empty.Name = "EmptyState"
+                    empty.BackgroundTransparency = 1
+                    empty.Size = UDim2.new(1, 0, 0, 22)
+                    empty.LayoutOrder = 11
+                    empty.Font = Enum.Font.Gotham
+                    empty.TextSize = 9
+                    empty.TextColor3 = Color3.fromRGB(65, 60, 85)
+                    empty.Text = "No keybinds assigned"
+                    empty.ZIndex = content.ZIndex + 2
+                    empty.Parent = content
+                end
+            else
+                if emptyLbl then emptyLbl:Destroy() end
             end
+        end
+
+        -- Public alias used by visibility hooks
+        local function syncContent()
+            buildEntries()
         end
         
         -- ======================
