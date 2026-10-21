@@ -793,23 +793,46 @@ local function ApplyMounxStyle(Library)
             buildEntries()
         end
 
-        -- Fast Hold-mode state loop (runs at ~20fps, much faster than the 0.3s general loop)
-        -- Watches kp.Toggled which is a Lua field (not an Instance property),
-        -- so GetPropertyChangedSignal won't work — we must poll it.
-        task.spawn(function()
-            local lastState = {}
-            while mxKB and mxKB.Parent do
-                task.wait(0.05)
-                if mxKB.Visible then
-                    for oName, data in pairs(holdEntries) do
-                        local kp = data.kp
+        -- Hold-mode instant detection via UserInputService
+        -- kp.Toggled is a plain Lua field — GetPropertyChangedSignal never fires on it.
+        -- We detect the actual key directly so response is instant (no polling lag).
+        local holdKeyStates = {}
+
+        local function getKeyCode(keyStr)
+            local ok, kc = pcall(function() return Enum.KeyCode[keyStr] end)
+            if ok and kc then return kc end
+            return nil
+        end
+
+        UIS.InputBegan:Connect(function(input, gpe)
+            if gpe then return end
+            if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+            for oName, data in pairs(holdEntries) do
+                local kp = data.kp
+                local kc = getKeyCode(tostring(kp.Value))
+                if kc and input.KeyCode == kc then
+                    if holdKeyStates[oName] ~= true then
+                        holdKeyStates[oName] = true
                         local entry = liveEntries[oName]
                         if entry and entry.Parent then
-                            local isActive = kp.Toggled == true
-                            if lastState[oName] ~= isActive then
-                                lastState[oName] = isActive
-                                applyEntryState(entry, isActive)
-                            end
+                            applyEntryState(entry, true)
+                        end
+                    end
+                end
+            end
+        end)
+
+        UIS.InputEnded:Connect(function(input)
+            if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+            for oName, data in pairs(holdEntries) do
+                local kp = data.kp
+                local kc = getKeyCode(tostring(kp.Value))
+                if kc and input.KeyCode == kc then
+                    if holdKeyStates[oName] ~= false then
+                        holdKeyStates[oName] = false
+                        local entry = liveEntries[oName]
+                        if entry and entry.Parent then
+                            applyEntryState(entry, false)
                         end
                     end
                 end
