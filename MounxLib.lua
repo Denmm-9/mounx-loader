@@ -106,31 +106,54 @@ local function ApplyMounxStyle(Library)
     if Library.WatermarkOuter then styleWidget(Library.WatermarkOuter) end
     if Library.KeybindFrame then 
         local kf = Library.KeybindFrame
-        addCorner(kf, 12)
-        kf.BackgroundColor3 = Color3.fromRGB(14, 11, 18)
-        kf.BackgroundTransparency = 0.02
+        addCorner(kf, 10)
+        kf.BackgroundColor3 = Color3.fromRGB(12, 10, 16)
+        kf.BackgroundTransparency = 0
         kf.BorderSizePixel = 0
         
-        -- Accent glow stroke
+        -- Outer glow stroke (subtle accent border)
         if not kf:FindFirstChild("KBStroke") then
             local stroke = Instance.new("UIStroke")
             stroke.Name = "KBStroke"
             stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            stroke.Thickness = 1.2
-            stroke.Transparency = 0.3
+            stroke.Thickness = 1
+            stroke.Transparency = 0.5
             stroke.Parent = kf
             Library:AddToRegistry(stroke, { Color = "AccentColor" })
         end
         
-        -- Top accent line with faded edges
+        -- Inner panel container with gradient background
+        if not kf:FindFirstChild("KBInnerPanel") then
+            local panel = Instance.new("Frame")
+            panel.Name = "KBInnerPanel"
+            panel.BackgroundColor3 = Color3.fromRGB(18, 15, 24)
+            panel.BackgroundTransparency = 0.3
+            panel.BorderSizePixel = 0
+            panel.Size = UDim2.new(1, -4, 1, -4)
+            panel.Position = UDim2.new(0, 2, 0, 2)
+            panel.ZIndex = kf.ZIndex
+            panel.Parent = kf
+            addCorner(panel, 8)
+            
+            -- Vertical gradient on inner panel
+            local panelGrad = Instance.new("UIGradient")
+            panelGrad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 24, 38)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 10, 16)),
+            })
+            panelGrad.Rotation = 90
+            panelGrad.Parent = panel
+        end
+        
+        -- Top accent bar (full width glow line)
         if not kf:FindFirstChild("KBAccentLine") then
             local line = Instance.new("Frame")
             line.Name = "KBAccentLine"
             line.BackgroundColor3 = Library.AccentColor
             line.BorderSizePixel = 0
-            line.Size = UDim2.new(1, -12, 0, 2)
-            line.Position = UDim2.new(0, 6, 0, 0)
-            line.ZIndex = kf.ZIndex + 5
+            line.Size = UDim2.new(1, 0, 0, 2)
+            line.Position = UDim2.new(0, 0, 0, 0)
+            line.ZIndex = kf.ZIndex + 10
             line.Parent = kf
             addCorner(line, 2)
             Library:AddToRegistry(line, { BackgroundColor3 = "AccentColor" })
@@ -138,49 +161,35 @@ local function ApplyMounxStyle(Library)
             local lineGrad = Instance.new("UIGradient")
             lineGrad.Transparency = NumberSequence.new({
                 NumberSequenceKeypoint.new(0, 1),
-                NumberSequenceKeypoint.new(0.15, 0),
-                NumberSequenceKeypoint.new(0.85, 0),
+                NumberSequenceKeypoint.new(0.1, 0.2),
+                NumberSequenceKeypoint.new(0.5, 0),
+                NumberSequenceKeypoint.new(0.9, 0.2),
                 NumberSequenceKeypoint.new(1, 1),
             })
             lineGrad.Parent = line
         end
         
-        -- Bottom accent line mirror
-        if not kf:FindFirstChild("KBBottomLine") then
-            local bLine = Instance.new("Frame")
-            bLine.Name = "KBBottomLine"
-            bLine.BackgroundColor3 = Library.AccentColor
-            bLine.BorderSizePixel = 0
-            bLine.Size = UDim2.new(1, -24, 0, 1)
-            bLine.Position = UDim2.new(0, 12, 1, -1)
-            bLine.ZIndex = kf.ZIndex + 5
-            bLine.Parent = kf
-            addCorner(bLine, 1)
-            Library:AddToRegistry(bLine, { BackgroundColor3 = "AccentColor" })
+        -- Accent glow haze under top bar
+        if not kf:FindFirstChild("KBGlowHaze") then
+            local haze = Instance.new("Frame")
+            haze.Name = "KBGlowHaze"
+            haze.BackgroundColor3 = Library.AccentColor
+            haze.BackgroundTransparency = 0.85
+            haze.BorderSizePixel = 0
+            haze.Size = UDim2.new(1, -8, 0, 20)
+            haze.Position = UDim2.new(0, 4, 0, 2)
+            haze.ZIndex = kf.ZIndex + 1
+            haze.Parent = kf
+            addCorner(haze, 8)
+            Library:AddToRegistry(haze, { BackgroundColor3 = "AccentColor" })
             
-            local bLineGrad = Instance.new("UIGradient")
-            bLineGrad.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 1),
-                NumberSequenceKeypoint.new(0.3, 0.5),
-                NumberSequenceKeypoint.new(0.7, 0.5),
+            local hazeGrad = Instance.new("UIGradient")
+            hazeGrad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0),
                 NumberSequenceKeypoint.new(1, 1),
             })
-            bLineGrad.Parent = bLine
-        end
-        
-        -- Title header bar background
-        if not kf:FindFirstChild("KBTitleBG") then
-            local titleBG = Instance.new("Frame")
-            titleBG.Name = "KBTitleBG"
-            titleBG.BackgroundColor3 = Library.AccentColor
-            titleBG.BackgroundTransparency = 0.9
-            titleBG.BorderSizePixel = 0
-            titleBG.Size = UDim2.new(1, -4, 0, 22)
-            titleBG.Position = UDim2.new(0, 2, 0, 2)
-            titleBG.ZIndex = kf.ZIndex + 1
-            titleBG.Parent = kf
-            addCorner(titleBG, 8)
-            Library:AddToRegistry(titleBG, { BackgroundColor3 = "AccentColor" })
+            hazeGrad.Rotation = 90
+            hazeGrad.Parent = haze
         end
         
         -- Style the title label
@@ -188,44 +197,205 @@ local function ApplyMounxStyle(Library)
         if title then
             title.Font = Enum.Font.GothamBold
             title.TextSize = 11
-            title.TextColor3 = Color3.fromRGB(220, 210, 235)
-            title.ZIndex = kf.ZIndex + 3
+            title.TextColor3 = Library.AccentColor
+            title.ZIndex = kf.ZIndex + 8
+            Library:AddToRegistry(title, { TextColor3 = "AccentColor" })
         end
         
-        -- Style each keybind entry
+        -- Separator line under title
+        if not kf:FindFirstChild("KBSeparator") then
+            local sep = Instance.new("Frame")
+            sep.Name = "KBSeparator"
+            sep.BackgroundColor3 = Color3.fromRGB(40, 35, 55)
+            sep.BorderSizePixel = 0
+            sep.Size = UDim2.new(1, -16, 0, 1)
+            sep.Position = UDim2.new(0, 8, 0, 22)
+            sep.ZIndex = kf.ZIndex + 6
+            sep.Parent = kf
+            
+            local sepGrad = Instance.new("UIGradient")
+            sepGrad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 1),
+                NumberSequenceKeypoint.new(0.2, 0.3),
+                NumberSequenceKeypoint.new(0.8, 0.3),
+                NumberSequenceKeypoint.new(1, 1),
+            })
+            sepGrad.Parent = sep
+        end
+        
+        -- Track entry index for alternating colors
+        local entryIndex = 0
+        
+        -- Style each keybind entry with advanced look
         local function styleEntry(label)
             if not label or not label:IsA("TextLabel") then return end
             if label == title then return end
             if label:FindFirstChild("KBStyled") then return end
             
-            label.Font = Enum.Font.GothamMedium
-            label.TextSize = 11
-            label.TextColor3 = Color3.fromRGB(190, 185, 205)
-            label.BackgroundColor3 = Color3.fromRGB(22, 18, 30)
-            label.BackgroundTransparency = 0.15
-            label.ZIndex = kf.ZIndex + 2
-            addCorner(label, 6)
+            entryIndex = entryIndex + 1
+            local isEven = (entryIndex % 2 == 0)
             
-            -- Left accent bar per entry
+            -- Hide original text (we render our own overlay)
+            label.TextTransparency = 1
+            label.BackgroundTransparency = 1
+            label.BorderSizePixel = 0
+            label.ClipsDescendants = true
+            local originalText = label.Text or ""
+            
+            -- Entry card container
+            local card = Instance.new("Frame")
+            card.Name = "KBCard"
+            card.BackgroundColor3 = isEven and Color3.fromRGB(22, 19, 30) or Color3.fromRGB(18, 15, 24)
+            card.BackgroundTransparency = 0.1
+            card.BorderSizePixel = 0
+            card.Size = UDim2.new(1, -6, 1, -2)
+            card.Position = UDim2.new(0, 3, 0, 1)
+            card.ZIndex = label.ZIndex + 1
+            card.Parent = label
+            addCorner(card, 6)
+            
+            -- Left accent bar (thin glowing strip)
             local accentBar = Instance.new("Frame")
-            accentBar.Name = "EntryDot"
+            accentBar.Name = "AccentBar"
             accentBar.BackgroundColor3 = Library.AccentColor
             accentBar.BorderSizePixel = 0
-            accentBar.Size = UDim2.new(0, 3, 0, 12)
-            accentBar.Position = UDim2.new(0, 2, 0.5, -6)
-            accentBar.ZIndex = label.ZIndex + 1
-            accentBar.Parent = label
+            accentBar.Size = UDim2.new(0, 2, 0.7, 0)
+            accentBar.Position = UDim2.new(0, 1, 0.15, 0)
+            accentBar.ZIndex = card.ZIndex + 2
+            accentBar.Parent = card
             addCorner(accentBar, 2)
             Library:AddToRegistry(accentBar, { BackgroundColor3 = "AccentColor" })
             
-            -- Subtle inner padding
-            if not label:FindFirstChild("KBPad") then
-                local pad = Instance.new("UIPadding")
-                pad.Name = "KBPad"
-                pad.PaddingLeft = UDim.new(0, 8)
-                pad.PaddingRight = UDim.new(0, 4)
-                pad.Parent = label
+            -- Parse the text: "  [KEY] Action Name (Type)"
+            local keyStr, actionName, typeName = "", originalText, ""
+            local keyMatch = originalText:match("%[(.-)%]")
+            if keyMatch then
+                keyStr = keyMatch
+                local afterKey = originalText:match("%]%s*(.+)") or ""
+                local typeMatch = afterKey:match("%((.-)%)%s*$")
+                if typeMatch then
+                    typeName = typeMatch
+                    actionName = afterKey:gsub("%s*%(" .. typeMatch .. "%)%s*$", "")
+                else
+                    actionName = afterKey
+                end
             end
+            actionName = actionName:match("^%s*(.-)%s*$") or actionName
+            
+            -- Key badge (styled pill)
+            local keyBadge = Instance.new("Frame")
+            keyBadge.Name = "KeyBadge"
+            keyBadge.BackgroundColor3 = Library.AccentColor
+            keyBadge.BackgroundTransparency = 0.82
+            keyBadge.BorderSizePixel = 0
+            keyBadge.Size = UDim2.new(0, 22, 0, 14)
+            keyBadge.Position = UDim2.new(0, 8, 0.5, -7)
+            keyBadge.ZIndex = card.ZIndex + 3
+            keyBadge.Parent = card
+            addCorner(keyBadge, 4)
+            Library:AddToRegistry(keyBadge, { BackgroundColor3 = "AccentColor" })
+            
+            -- Key badge border
+            local keyStroke = Instance.new("UIStroke")
+            keyStroke.Name = "KeyStroke"
+            keyStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            keyStroke.Thickness = 1
+            keyStroke.Transparency = 0.4
+            keyStroke.Parent = keyBadge
+            Library:AddToRegistry(keyStroke, { Color = "AccentColor" })
+            
+            -- Key text inside badge
+            local keyLabel = Instance.new("TextLabel")
+            keyLabel.Name = "KeyText"
+            keyLabel.BackgroundTransparency = 1
+            keyLabel.Size = UDim2.new(1, 0, 1, 0)
+            keyLabel.Font = Enum.Font.GothamBold
+            keyLabel.TextSize = 9
+            keyLabel.TextColor3 = Library.AccentColor
+            keyLabel.Text = keyStr
+            keyLabel.ZIndex = card.ZIndex + 4
+            keyLabel.Parent = keyBadge
+            Library:AddToRegistry(keyLabel, { TextColor3 = "AccentColor" })
+            
+            -- Adjust badge width to fit key text
+            local textWidth = math.max(12, #keyStr * 7 + 8)
+            keyBadge.Size = UDim2.new(0, textWidth, 0, 14)
+            
+            -- Action name label
+            local actionLabel = Instance.new("TextLabel")
+            actionLabel.Name = "ActionText"
+            actionLabel.BackgroundTransparency = 1
+            actionLabel.Size = UDim2.new(1, -(textWidth + 16 + (typeName ~= "" and 50 or 0)), 1, 0)
+            actionLabel.Position = UDim2.new(0, textWidth + 14, 0, 0)
+            actionLabel.Font = Enum.Font.GothamMedium
+            actionLabel.TextSize = 10
+            actionLabel.TextColor3 = Color3.fromRGB(200, 195, 215)
+            actionLabel.TextXAlignment = Enum.TextXAlignment.Left
+            actionLabel.TextTruncate = Enum.TextTruncate.AtEnd
+            actionLabel.Text = actionName
+            actionLabel.ZIndex = card.ZIndex + 3
+            actionLabel.Parent = card
+            
+            -- Type tag (Toggle/Hold) as a subtle pill on the right
+            if typeName ~= "" then
+                local typeTag = Instance.new("Frame")
+                typeTag.Name = "TypeTag"
+                typeTag.BackgroundColor3 = Color3.fromRGB(35, 30, 50)
+                typeTag.BackgroundTransparency = 0.2
+                typeTag.BorderSizePixel = 0
+                typeTag.Size = UDim2.new(0, 42, 0, 12)
+                typeTag.Position = UDim2.new(1, -48, 0.5, -6)
+                typeTag.ZIndex = card.ZIndex + 3
+                typeTag.Parent = card
+                addCorner(typeTag, 4)
+                
+                local typeLabel = Instance.new("TextLabel")
+                typeLabel.Name = "TypeText"
+                typeLabel.BackgroundTransparency = 1
+                typeLabel.Size = UDim2.new(1, 0, 1, 0)
+                typeLabel.Font = Enum.Font.Gotham
+                typeLabel.TextSize = 8
+                typeLabel.TextColor3 = Color3.fromRGB(140, 135, 160)
+                typeLabel.Text = typeName
+                typeLabel.ZIndex = card.ZIndex + 4
+                typeLabel.Parent = typeTag
+            end
+            
+            -- Hover effect on card
+            local hoverStroke = Instance.new("UIStroke")
+            hoverStroke.Name = "HoverGlow"
+            hoverStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            hoverStroke.Thickness = 1
+            hoverStroke.Transparency = 1
+            hoverStroke.Parent = card
+            Library:AddToRegistry(hoverStroke, { Color = "AccentColor" })
+            
+            local tIn = TweenService:Create(hoverStroke, TweenInfo.new(0.15), {Transparency = 0.5})
+            local tOut = TweenService:Create(hoverStroke, TweenInfo.new(0.25), {Transparency = 1})
+            card.MouseEnter:Connect(function() tIn:Play() end)
+            card.MouseLeave:Connect(function() tOut:Play() end)
+            
+            -- Watch for text changes to update our overlay
+            label:GetPropertyChangedSignal("Text"):Connect(function()
+                local newText = label.Text or ""
+                local nKey = newText:match("%[(.-)%]") or ""
+                local nAction = newText:match("%]%s*(.+)") or newText
+                local nType = nAction:match("%((.-)%)%s*$") or ""
+                if nType ~= "" then
+                    nAction = nAction:gsub("%s*%(" .. nType .. "%)%s*$", "")
+                end
+                nAction = nAction:match("^%s*(.-)%s*$") or nAction
+                pcall(function() keyLabel.Text = nKey end)
+                pcall(function() actionLabel.Text = nAction end)
+                local tw = math.max(12, #nKey * 7 + 8)
+                pcall(function() keyBadge.Size = UDim2.new(0, tw, 0, 14) end)
+                pcall(function() actionLabel.Position = UDim2.new(0, tw + 14, 0, 0) end)
+                local typeTag = card:FindFirstChild("TypeTag")
+                if typeTag then
+                    local tl = typeTag:FindFirstChild("TypeText")
+                    if tl then tl.Text = nType end
+                end
+            end)
             
             local tag = Instance.new("BoolValue")
             tag.Name = "KBStyled"
