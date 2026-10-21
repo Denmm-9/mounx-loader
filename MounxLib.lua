@@ -347,56 +347,42 @@ local function ApplyMounxStyle(Library)
             keyText.Parent = badge
             Library:AddToRegistry(keyText, { TextColor3 = "AccentColor" })
             
-            -- Type tag pill (right side) - styled by type
+            -- Type tag pill (right side)
             local typeTagW = 0
             if typeName ~= "" then
-                typeTagW = math.max(40, #typeName * 6 + 14)
+                typeTagW = math.max(36, #typeName * 5 + 14)
                 local typeTag = Instance.new("Frame")
                 typeTag.Name = "TypeTag"
                 typeTag.BorderSizePixel = 0
-                typeTag.Size = UDim2.new(0, typeTagW, 0, 14)
-                typeTag.Position = UDim2.new(1, -(typeTagW + 6), 0.5, -7)
+                typeTag.Size = UDim2.new(0, typeTagW, 0, 12)
+                typeTag.Position = UDim2.new(1, -(typeTagW + 6), 0.5, -6)
                 typeTag.ZIndex = entry.ZIndex + 2
                 typeTag.Parent = entry
-                addCorner(typeTag, 4)
+                addCorner(typeTag, 3)
                 
-                -- Color-code by type
+                local typeLabel = Instance.new("TextLabel")
+                typeLabel.BackgroundTransparency = 1
+                typeLabel.Size = UDim2.new(1, 0, 1, 0)
+                typeLabel.Font = Enum.Font.Gotham
+                typeLabel.TextSize = 7
+                typeLabel.ZIndex = entry.ZIndex + 3
+                typeLabel.Parent = typeTag
+                
                 if typeName == "Toggle" then
-                    typeTag.BackgroundColor3 = Color3.fromRGB(20, 35, 25)
-                    typeTag.BackgroundTransparency = 0.15
-                    local typeLabel = Instance.new("TextLabel")
-                    typeLabel.BackgroundTransparency = 1
-                    typeLabel.Size = UDim2.new(1, 0, 1, 0)
-                    typeLabel.Font = Enum.Font.GothamBold
-                    typeLabel.TextSize = 8
-                    typeLabel.TextColor3 = Color3.fromRGB(80, 190, 110)
-                    typeLabel.Text = "TOGGLE"
-                    typeLabel.ZIndex = entry.ZIndex + 3
-                    typeLabel.Parent = typeTag
+                    typeTag.BackgroundColor3 = Color3.fromRGB(25, 40, 30)
+                    typeTag.BackgroundTransparency = 0.25
+                    typeLabel.TextColor3 = Color3.fromRGB(75, 170, 100)
+                    typeLabel.Text = "Toggle"
                 elseif typeName == "Hold" then
-                    typeTag.BackgroundColor3 = Color3.fromRGB(35, 25, 18)
-                    typeTag.BackgroundTransparency = 0.15
-                    local typeLabel = Instance.new("TextLabel")
-                    typeLabel.BackgroundTransparency = 1
-                    typeLabel.Size = UDim2.new(1, 0, 1, 0)
-                    typeLabel.Font = Enum.Font.GothamBold
-                    typeLabel.TextSize = 8
-                    typeLabel.TextColor3 = Color3.fromRGB(220, 160, 60)
-                    typeLabel.Text = "HOLD"
-                    typeLabel.ZIndex = entry.ZIndex + 3
-                    typeLabel.Parent = typeTag
+                    typeTag.BackgroundColor3 = Color3.fromRGB(40, 30, 20)
+                    typeTag.BackgroundTransparency = 0.25
+                    typeLabel.TextColor3 = Color3.fromRGB(200, 150, 60)
+                    typeLabel.Text = "Hold"
                 else
-                    typeTag.BackgroundColor3 = Color3.fromRGB(30, 26, 42)
-                    typeTag.BackgroundTransparency = 0.15
-                    local typeLabel = Instance.new("TextLabel")
-                    typeLabel.BackgroundTransparency = 1
-                    typeLabel.Size = UDim2.new(1, 0, 1, 0)
-                    typeLabel.Font = Enum.Font.GothamBold
-                    typeLabel.TextSize = 8
-                    typeLabel.TextColor3 = Color3.fromRGB(140, 135, 165)
-                    typeLabel.Text = string.upper(typeName)
-                    typeLabel.ZIndex = entry.ZIndex + 3
-                    typeLabel.Parent = typeTag
+                    typeTag.BackgroundColor3 = Color3.fromRGB(30, 26, 40)
+                    typeTag.BackgroundTransparency = 0.25
+                    typeLabel.TextColor3 = Color3.fromRGB(120, 115, 145)
+                    typeLabel.Text = typeName
                 end
             end
             
@@ -470,19 +456,31 @@ local function ApplyMounxStyle(Library)
                 end
             end
             
-            -- Strategy 3: if still none, read from Library's internal keybind options
+            -- Strategy 3: if still none, read from Library's internal keybind options (ONLY active ones)
             if #entries == 0 then
                 pcall(function()
                     for optName, opt in pairs(Library.Options) do
-                        if opt and opt.KeyPicker and opt.Value then
-                            local kp = opt.KeyPicker
-                            local keyVal = kp.Value or opt.Value
-                            local mode = kp.Mode or "Toggle"
-                            local label = kp.Text or opt.Text or optName
-                            if keyVal and tostring(keyVal) ~= "" and tostring(keyVal) ~= "None" and tostring(keyVal) ~= "Unknown" then
-                                table.insert(entries, "[" .. tostring(keyVal) .. "] " .. tostring(label) .. " (" .. tostring(mode) .. ")")
+                        pcall(function()
+                            -- Check if this is a KeyPicker
+                            if opt and (opt.Type == "KeyPicker" or (opt.KeyPicker)) then
+                                local kp = opt.Type == "KeyPicker" and opt or opt.KeyPicker
+                                local keyVal = kp.Value
+                                local mode = kp.Mode or "Toggle"
+                                local label = kp.Text or optName
+                                local isActive = false
+                                
+                                -- Only show if keybind is currently active
+                                if mode == "Always" then
+                                    isActive = true
+                                elseif kp.Toggled then
+                                    isActive = true
+                                end
+                                
+                                if isActive and keyVal and tostring(keyVal) ~= "" and tostring(keyVal) ~= "None" and tostring(keyVal) ~= "Unknown" then
+                                    table.insert(entries, "[" .. tostring(keyVal) .. "] " .. tostring(label) .. " (" .. tostring(mode) .. ")")
+                                end
                             end
-                        end
+                        end)
                     end
                 end)
             end
@@ -635,10 +633,10 @@ local function ApplyMounxStyle(Library)
             end
         end)
         
-        -- Periodic sync: catch entries added/changed while panel is open
+        -- Periodic sync: fast updates for dynamic keybind state changes
         task.spawn(function()
             while mxKB and mxKB.Parent do
-                task.wait(1)
+                task.wait(0.3)
                 if mxKB.Visible then
                     hideKF()
                     syncContent()
