@@ -1654,6 +1654,8 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         end)
     end)
 
+    InterfaceGroup:AddDivider()
+    
     InterfaceGroup:AddToggle('AutoReExecToggle', {
         Text = 'Auto Re-Execute on Teleport', Default = false,
         Tooltip = 'Automatically re-runs your script after any teleport (queues with queue_on_teleport)'
