@@ -1797,6 +1797,52 @@ end
 
 function MounxHub:BuildVisuals(VisualsTab, options)
     -- =============================================
+    -- Internal polyfill: patch AddColorPicker + AddDependencyBox
+    -- on this tab's groupboxes so LinoriaLib forks work correctly.
+    -- This is safe — it only patches the specific tab object, not globals.
+    -- =============================================
+    do
+        local function patchGB(gb)
+            if not gb then return gb end
+            if not gb.AddColorPicker then
+                gb.AddColorPicker = function(s, id, info)
+                    local lbl = s:AddLabel((info and (info.Text or info.Title)) or id)
+                    return lbl:AddColorPicker(id, info)
+                end
+            end
+            local origDep = gb.AddDependencyBox
+            if origDep then
+                gb.AddDependencyBox = function(s, ...)
+                    local dep = origDep(s, ...)
+                    if type(dep) == "table" and not dep.SetVisible then
+                        dep.SetVisible = function(dSelf, vis)
+                            pcall(function()
+                                if dSelf.Container and dSelf.Container.Parent then
+                                    dSelf.Container.Parent.Visible = vis
+                                end
+                            end)
+                            pcall(function() if dSelf.Resize then dSelf:Resize() end end)
+                        end
+                    end
+                    return dep
+                end
+            end
+            return gb
+        end
+        local origLeft  = VisualsTab.AddLeftGroupbox
+        local origRight = VisualsTab.AddRightGroupbox
+        VisualsTab.AddLeftGroupbox = function(self, ...)
+            return patchGB(origLeft(self, ...))
+        end
+        VisualsTab.AddRightGroupbox = function(self, ...)
+            return patchGB(origRight(self, ...))
+        end
+    end
+
+    -- =============================================
+    -- Left: ESP groupbox
+    -- =============================================
+    -- =============================================
     -- Left: ESP groupbox
     -- =============================================
     local ESPGroup = VisualsTab:AddLeftGroupbox('ESP')
@@ -1812,14 +1858,8 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     })
 
     -- =============================================
-    -- Left: Box Settings groupbox (DependencyBox on ESPEnabled)
+    -- Left: Box Settings groupbox
     -- =============================================
-    local BoxDepBox = ESPGroup:AddDependencyBox()
-    Library.Toggles.ESPEnabled:OnChanged(function(v)
-        BoxDepBox:SetVisible(v)
-    end)
-    BoxDepBox:SetVisible(false)
-
     local BoxSettingsGroup = VisualsTab:AddLeftGroupbox('Box Settings')
 
     BoxSettingsGroup:AddToggle('BoxFilled', { Text = 'Filled Box', Default = false })
@@ -1902,25 +1942,647 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         Tooltip = 'Shows a live 3D preview of your character with ESP overlays'
     })
 
-    -- =============================================
-    -- ESP Preview Panel logic
-    -- =============================================
+    -- ============================================================
+    -- IN-GAME ESP RENDERING ENGINE (Drawings & Highlights)
+    -- ============================================================
+    local Camera = workspace.CurrentCamera
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local LocalPlayer = Players.LocalPlayer
+
+    local hasDrawing = false
+    pcall(function()
+        local test = Drawing.new("Line")
+        test:Remove()
+        hasDrawing = true
+    end)
+
+    local ESPCache = {} -- [instance] = { drawings... }
+    local cachedNPCs = {}
+
+    local function getTargetColor(isPlayer)
+        local opt = isPlayer and Library.Options.BoxColorPlayers or Library.Options.BoxColorNPCs
+        return opt and opt.Value or Color3.fromRGB(255, 100, 100)
+    end
+
+    local function createEntryDrawings()
+        if not hasDrawing then return {} end
+        local d = {}
+        -- 2D Box
+        d.boxOutline = Drawing.new("Square")
+        d.boxOutline.Thickness = 3
+        d.boxOutline.Filled = false
+        d.boxOutline.Color = Color3.fromRGB(0, 0, 0)
+        d.boxOutline.Visible = false
+
+        d.box = Drawing.new("Square")
+        d.box.Thickness = 1.5
+        d.box.Filled = false
+        d.box.Visible = false
+
+        -- 8 Corner Lines + 8 Outlines
+        d.corners = {}
+        d.cornerOutlines = {}
+        for i = 1, 8 do
+            local co = Drawing.new("Line")
+            co.Thickness = 3
+            co.Color = Color3.fromRGB(0, 0, 0)
+            co.Visible = false
+            table.insert(d.cornerOutlines, co)
+
+            local c = Drawing.new("Line")
+            c.Thickness = 1.5
+            c.Visible = false
+            table.insert(d.corners, c)
+        end
+
+        -- 12 3D Box Lines
+        d.box3D = {}
+        for i = 1, 12 do
+            local l = Drawing.new("Line")
+            l.Thickness = 1.5
+            l.Visible = false
+            table.insert(d.box3D, l)
+        end
+
+        -- Health bar
+        d.healthBarOutline = Drawing.new("Square")
+        d.healthBarOutline.Thickness = 1
+        d.healthBarOutline.Filled = true
+        d.healthBarOutline.Color = Color3.fromRGB(0, 0, 0)
+        d.healthBarOutline.Visible = false
+
+        d.healthBar = Drawing.new("Square")
+        d.healthBar.Thickness = 1
+        d.healthBar.Filled = true
+        d.healthBar.Visible = false
+
+        d.healthText = Drawing.new("Text")
+        d.healthText.Size = 11
+        d.healthText.Center = true
+        d.healthText.Outline = true
+        d.healthText.OutlineColor = Color3.fromRGB(0, 0, 0)
+        d.healthText.Color = Color3.fromRGB(255, 255, 255)
+        d.healthText.Visible = false
+
+        -- Texts
+        d.nameText = Drawing.new("Text")
+        d.nameText.Size = 13
+        d.nameText.Center = true
+        d.nameText.Outline = true
+        d.nameText.OutlineColor = Color3.fromRGB(0, 0, 0)
+        d.nameText.Visible = false
+
+        d.distText = Drawing.new("Text")
+        d.distText.Size = 11
+        d.distText.Center = true
+        d.distText.Outline = true
+        d.distText.OutlineColor = Color3.fromRGB(0, 0, 0)
+        d.distText.Visible = false
+
+        -- Tracer
+        d.tracerOutline = Drawing.new("Line")
+        d.tracerOutline.Thickness = 3
+        d.tracerOutline.Color = Color3.fromRGB(0, 0, 0)
+        d.tracerOutline.Visible = false
+
+        d.tracer = Drawing.new("Line")
+        d.tracer.Thickness = 1.5
+        d.tracer.Visible = false
+
+        -- Off-screen Arrow
+        d.arrow = Drawing.new("Triangle")
+        d.arrow.Filled = true
+        d.arrow.Visible = false
+
+        return d
+    end
+
+    local function hideDrawings(d)
+        if not d then return end
+        if d.box then d.box.Visible = false end
+        if d.boxOutline then d.boxOutline.Visible = false end
+        if d.corners then for _, l in ipairs(d.corners) do l.Visible = false end end
+        if d.cornerOutlines then for _, l in ipairs(d.cornerOutlines) do l.Visible = false end end
+        if d.box3D then for _, l in ipairs(d.box3D) do l.Visible = false end end
+        if d.healthBar then d.healthBar.Visible = false end
+        if d.healthBarOutline then d.healthBarOutline.Visible = false end
+        if d.healthText then d.healthText.Visible = false end
+        if d.nameText then d.nameText.Visible = false end
+        if d.distText then d.distText.Visible = false end
+        if d.tracer then d.tracer.Visible = false end
+        if d.tracerOutline then d.tracerOutline.Visible = false end
+        if d.arrow then d.arrow.Visible = false end
+    end
+
+    local function destroyDrawings(d)
+        if not d then return end
+        hideDrawings(d)
+        pcall(function()
+            if d.box then d.box:Remove() end
+            if d.boxOutline then d.boxOutline:Remove() end
+            if d.corners then for _, l in ipairs(d.corners) do l:Remove() end end
+            if d.cornerOutlines then for _, l in ipairs(d.cornerOutlines) do l:Remove() end end
+            if d.box3D then for _, l in ipairs(d.box3D) do l:Remove() end end
+            if d.healthBar then d.healthBar:Remove() end
+            if d.healthBarOutline then d.healthBarOutline:Remove() end
+            if d.healthText then d.healthText:Remove() end
+            if d.nameText then d.nameText:Remove() end
+            if d.distText then d.distText:Remove() end
+            if d.tracer then d.tracer:Remove() end
+            if d.tracerOutline then d.tracerOutline:Remove() end
+            if d.arrow then d.arrow:Remove() end
+        end)
+    end
+
+    -- Background NPC scan (runs every 1.5s to prevent any framerate drops)
+    task.spawn(function()
+        while not Library.Unloaded do
+            task.wait(1.5)
+            local targetMode = Library.Options.ESPTarget and Library.Options.ESPTarget.Value or "Players"
+            if Library.Toggles.ESPEnabled and Library.Toggles.ESPEnabled.Value and (targetMode == "NPCs" or targetMode == "Both") then
+                local list = {}
+                local lpChar = LocalPlayer and LocalPlayer.Character
+                pcall(function()
+                    for _, desc in ipairs(workspace:GetDescendants()) do
+                        if desc:IsA("Humanoid") and desc.Health > 0 then
+                            local model = desc.Parent
+                            if model and model:IsA("Model") and model ~= lpChar then
+                                if not Players:GetPlayerFromCharacter(model) then
+                                    local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart or model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso")
+                                    if root then
+                                        table.insert(list, { model = model, humanoid = desc, root = root })
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+                cachedNPCs = list
+            else
+                cachedNPCs = {}
+            end
+        end
+    end)
+
+    -- Main ESP Render Loop
+    RunService.RenderStepped:Connect(function()
+        if not Library or Library.Unloaded then return end
+        local espOn = Library.Toggles.ESPEnabled and Library.Toggles.ESPEnabled.Value
+
+        if not espOn then
+            for model, d in pairs(ESPCache) do
+                hideDrawings(d)
+                local hl = model:FindFirstChild("MounxCham")
+                if hl then hl.Enabled = false end
+            end
+            return
+        end
+
+        local targetMode = Library.Options.ESPTarget and Library.Options.ESPTarget.Value or "Players"
+        local boxStyle = Library.Options.BoxStyle and Library.Options.BoxStyle.Value or "2D Box"
+        local boxFilled = Library.Toggles.BoxFilled and Library.Toggles.BoxFilled.Value
+        local fillTrans = Library.Options.BoxFillTransparency and Library.Options.BoxFillTransparency.Value or 0.5
+        local textColor = Library.Options.TextColor and Library.Options.TextColor.Value or Color3.fromRGB(255, 255, 255)
+        local tracerColor = Library.Options.TracerColor and Library.Options.TracerColor.Value or Color3.fromRGB(255, 107, 157)
+        local arrowColor = Library.Options.ArrowColor and Library.Options.ArrowColor.Value or Color3.fromRGB(255, 255, 255)
+
+        -- Gather active targets
+        local targets = {}
+        if targetMode == "Players" or targetMode == "Both" then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character then
+                    local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                    local root = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso")
+                    if hum and root and hum.Health > 0 then
+                        table.insert(targets, {
+                            model = p.Character,
+                            humanoid = hum,
+                            root = root,
+                            name = p.DisplayName or p.Name,
+                            isPlayer = true
+                        })
+                    end
+                end
+            end
+        end
+        if targetMode == "NPCs" or targetMode == "Both" then
+            for _, npc in ipairs(cachedNPCs) do
+                if npc.model and npc.model.Parent and npc.humanoid and npc.humanoid.Health > 0 and npc.root and npc.root.Parent then
+                    table.insert(targets, {
+                        model = npc.model,
+                        humanoid = npc.humanoid,
+                        root = npc.root,
+                        name = npc.model.Name,
+                        isPlayer = false
+                    })
+                end
+            end
+        end
+
+        local seenModels = {}
+
+        for _, t in ipairs(targets) do
+            local model = t.model
+            seenModels[model] = true
+            local root = t.root
+            local hum = t.humanoid
+            local isPlayer = t.isPlayer
+            local rootPos = root.Position
+            local camPos = Camera.CFrame.Position
+
+            local screenPos, onScreen = Camera:WorldToViewportPoint(rootPos)
+
+            -- Chams (Highlights work regardless of Drawing)
+            if Library.Toggles.ChamsESP and Library.Toggles.ChamsESP.Value then
+                local hl = model:FindFirstChild("MounxCham")
+                if not hl then
+                    hl = Instance.new("Highlight")
+                    hl.Name = "MounxCham"
+                    hl.Adornee = model
+                    hl.Parent = model
+                end
+                local chamCol = Library.Options.ChamsColorVisible and Library.Options.ChamsColorVisible.Value or Color3.fromRGB(255, 107, 157)
+                hl.FillColor = chamCol
+                hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                hl.FillTransparency = 0.5
+                hl.OutlineTransparency = 0
+                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                hl.Enabled = true
+            else
+                local hl = model:FindFirstChild("MounxCham")
+                if hl then hl.Enabled = false end
+            end
+
+            -- Drawing components
+            if hasDrawing then
+                local d = ESPCache[model]
+                if not d then
+                    d = createEntryDrawings()
+                    ESPCache[model] = d
+                end
+
+                if onScreen then
+                    -- Hide off-screen arrow
+                    if d.arrow then d.arrow.Visible = false end
+
+                    local topScreen = Camera:WorldToViewportPoint(rootPos + Vector3.new(0, 2.7, 0))
+                    local botScreen = Camera:WorldToViewportPoint(rootPos - Vector3.new(0, 3.2, 0))
+                    local boxHeight = math.abs(botScreen.Y - topScreen.Y)
+                    local boxWidth = math.max(10, boxHeight * 0.65)
+                    local boxX = screenPos.X - (boxWidth / 2)
+                    local boxY = topScreen.Y
+                    local themeColor = getTargetColor(isPlayer)
+
+                    -- 1. BOXES
+                    if boxStyle == "2D Box" or boxStyle == "Full Box" then
+                        -- Hide corner & 3D lines
+                        if d.corners then for _, l in ipairs(d.corners) do l.Visible = false end end
+                        if d.cornerOutlines then for _, l in ipairs(d.cornerOutlines) do l.Visible = false end end
+                        if d.box3D then for _, l in ipairs(d.box3D) do l.Visible = false end end
+
+                        d.box.Visible = true
+                        d.box.Size = Vector2.new(boxWidth, boxHeight)
+                        d.box.Position = Vector2.new(boxX, boxY)
+                        d.box.Color = themeColor
+                        d.box.Filled = boxFilled
+                        d.box.Transparency = boxFilled and (1 - fillTrans) or 1
+
+                        d.boxOutline.Visible = not boxFilled
+                        d.boxOutline.Size = Vector2.new(boxWidth + 2, boxHeight + 2)
+                        d.boxOutline.Position = Vector2.new(boxX - 1, boxY - 1)
+
+                    elseif boxStyle == "Corner Box" then
+                        d.box.Visible = false
+                        d.boxOutline.Visible = false
+                        if d.box3D then for _, l in ipairs(d.box3D) do l.Visible = false end end
+
+                        local cl = math.clamp(boxWidth * 0.28, 4, 18)
+                        local segs = {
+                            { Vector2.new(boxX, boxY), Vector2.new(boxX + cl, boxY) },
+                            { Vector2.new(boxX, boxY), Vector2.new(boxX, boxY + cl) },
+                            { Vector2.new(boxX + boxWidth, boxY), Vector2.new(boxX + boxWidth - cl, boxY) },
+                            { Vector2.new(boxX + boxWidth, boxY), Vector2.new(boxX + boxWidth, boxY + cl) },
+                            { Vector2.new(boxX, boxY + boxHeight), Vector2.new(boxX + cl, boxY + boxHeight) },
+                            { Vector2.new(boxX, boxY + boxHeight), Vector2.new(boxX, boxY + boxHeight - cl) },
+                            { Vector2.new(boxX + boxWidth, boxY + boxHeight), Vector2.new(boxX + boxWidth - cl, boxY + boxHeight) },
+                            { Vector2.new(boxX + boxWidth, boxY + boxHeight), Vector2.new(boxX + boxWidth, boxY + boxHeight - cl) },
+                        }
+                        for i = 1, 8 do
+                            local seg = segs[i]
+                            local co = d.cornerOutlines[i]
+                            local c = d.corners[i]
+                            if co and c then
+                                co.Visible = true
+                                co.From = seg[1]
+                                co.To = seg[2]
+                                c.Visible = true
+                                c.From = seg[1]
+                                c.To = seg[2]
+                                c.Color = themeColor
+                            end
+                        end
+
+                    elseif boxStyle == "3D Box" then
+                        d.box.Visible = false
+                        d.boxOutline.Visible = false
+                        if d.corners then for _, l in ipairs(d.corners) do l.Visible = false end end
+                        if d.cornerOutlines then for _, l in ipairs(d.cornerOutlines) do l.Visible = false end end
+
+                        local cf = root.CFrame
+                        local sx, sy, sz = 1.8, 2.8, 1.2
+                        local pts = {
+                            cf * Vector3.new(-sx,  sy, -sz),
+                            cf * Vector3.new( sx,  sy, -sz),
+                            cf * Vector3.new( sx, -sy, -sz),
+                            cf * Vector3.new(-sx, -sy, -sz),
+                            cf * Vector3.new(-sx,  sy,  sz),
+                            cf * Vector3.new( sx,  sy,  sz),
+                            cf * Vector3.new( sx, -sy,  sz),
+                            cf * Vector3.new(-sx, -sy,  sz),
+                        }
+                        local sPts = {}
+                        local allVis = true
+                        for i = 1, 8 do
+                            local sp, v = Camera:WorldToViewportPoint(pts[i])
+                            if not v then allVis = false break end
+                            sPts[i] = Vector2.new(sp.X, sp.Y)
+                        end
+                        if allVis then
+                            local edges = {
+                                {1,2}, {2,3}, {3,4}, {4,1},
+                                {5,6}, {6,7}, {7,8}, {8,5},
+                                {1,5}, {2,6}, {3,7}, {4,8}
+                            }
+                            for i = 1, 12 do
+                                local edge = edges[i]
+                                local l = d.box3D[i]
+                                if l then
+                                    l.Visible = true
+                                    l.From = sPts[edge[1]]
+                                    l.To = sPts[edge[2]]
+                                    l.Color = themeColor
+                                end
+                            end
+                        else
+                            for _, l in ipairs(d.box3D) do l.Visible = false end
+                        end
+                    end
+
+                    -- 2. HEALTH BAR
+                    if Library.Toggles.HealthBarESP and Library.Toggles.HealthBarESP.Value then
+                        local maxHp = hum.MaxHealth > 0 and hum.MaxHealth or 100
+                        local hp = math.clamp(hum.Health, 0, maxHp)
+                        local hpPercent = hp / maxHp
+                        local barWidth = 3
+                        local barX = boxX - barWidth - 5
+                        local barY = boxY
+                        local barH = boxHeight
+
+                        d.healthBarOutline.Visible = true
+                        d.healthBarOutline.Position = Vector2.new(barX - 1, barY - 1)
+                        d.healthBarOutline.Size = Vector2.new(barWidth + 2, barH + 2)
+
+                        local fillH = math.floor(barH * hpPercent)
+                        d.healthBar.Visible = true
+                        d.healthBar.Position = Vector2.new(barX, barY + (barH - fillH))
+                        d.healthBar.Size = Vector2.new(barWidth, fillH)
+
+                        local customHpColor = Library.Options.HealthBarColor and Library.Options.HealthBarColor.Value
+                        local hpGrad = Color3.fromRGB(255, 40, 40):Lerp(Color3.fromRGB(40, 255, 100), hpPercent)
+                        d.healthBar.Color = customHpColor or hpGrad
+
+                        if Library.Toggles.HealthBarText and Library.Toggles.HealthBarText.Value then
+                            d.healthText.Visible = true
+                            d.healthText.Text = tostring(math.floor(hp))
+                            d.healthText.Position = Vector2.new(barX - 10, barY + (barH - fillH) - 6)
+                        else
+                            d.healthText.Visible = false
+                        end
+                    else
+                        d.healthBar.Visible = false
+                        d.healthBarOutline.Visible = false
+                        d.healthText.Visible = false
+                    end
+
+                    -- 3. TEXTS (Name, Distance, Health Text)
+                    if Library.Toggles.NameESP and Library.Toggles.NameESP.Value then
+                        d.nameText.Visible = true
+                        d.nameText.Text = t.name
+                        d.nameText.Position = Vector2.new(boxX + (boxWidth / 2), boxY - 15)
+                        d.nameText.Color = textColor
+                    else
+                        d.nameText.Visible = false
+                    end
+
+                    local botOffset = 2
+                    if Library.Toggles.DistanceESP and Library.Toggles.DistanceESP.Value then
+                        local dist = math.floor((camPos - rootPos).Magnitude)
+                        d.distText.Visible = true
+                        d.distText.Text = dist .. " studs"
+                        d.distText.Position = Vector2.new(boxX + (boxWidth / 2), boxY + boxHeight + botOffset)
+                        d.distText.Color = textColor
+                    else
+                        d.distText.Visible = false
+                    end
+
+                    -- 4. TRACERS
+                    if Library.Toggles.TracerESP and Library.Toggles.TracerESP.Value then
+                        local origMode = Library.Options.TracerOrigin and Library.Options.TracerOrigin.Value or "Bottom"
+                        local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        if origMode == "Center" then
+                            origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                        elseif origMode == "Top" then
+                            origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
+                        elseif origMode == "Mouse" then
+                            origin = UIS:GetMouseLocation()
+                        end
+
+                        local targetPt = Vector2.new(boxX + (boxWidth / 2), boxY + boxHeight)
+                        d.tracerOutline.Visible = true
+                        d.tracerOutline.From = origin
+                        d.tracerOutline.To = targetPt
+
+                        d.tracer.Visible = true
+                        d.tracer.From = origin
+                        d.tracer.To = targetPt
+                        d.tracer.Color = tracerColor
+                    else
+                        d.tracer.Visible = false
+                        d.tracerOutline.Visible = false
+                    end
+
+                else
+                    -- Target is OFF-SCREEN: Hide 2D elements, show Off-Screen Arrow if enabled
+                    hideDrawings(d)
+
+                    if Library.Toggles.ArrowESP and Library.Toggles.ArrowESP.Value then
+                        local camCF = Camera.CFrame
+                        local toTarget = (rootPos - camCF.Position).Unit
+                        local rel = camCF:VectorToObjectSpace(toTarget)
+                        local angle = math.atan2(rel.X, rel.Z)
+
+                        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                        local radius = math.min(center.X, center.Y) * 0.75
+                        local dir = Vector2.new(math.sin(angle), -math.cos(angle))
+                        local arrowCenter = center + dir * radius
+
+                        local fwd = dir * 14
+                        local rgt = Vector2.new(-dir.Y, dir.X) * 7
+
+                        d.arrow.Visible = true
+                        d.arrow.PointA = arrowCenter + fwd
+                        d.arrow.PointB = arrowCenter - fwd * 0.4 + rgt
+                        d.arrow.PointC = arrowCenter - fwd * 0.4 - rgt
+                        d.arrow.Color = arrowColor
+                    else
+                        d.arrow.Visible = false
+                    end
+                end
+            end
+        end
+
+        -- Clean up dead / unrendered models from cache
+        for model, d in pairs(ESPCache) do
+            if not seenModels[model] then
+                destroyDrawings(d)
+                ESPCache[model] = nil
+                local hl = model:FindFirstChild("MounxCham")
+                if hl then hl.Enabled = false end
+            end
+        end
+    end)
+
+    -- Clean up drawings on Library Unload
+    if Library.Unload then
+        local oldUnload = Library.Unload
+        Library.Unload = function(s, ...)
+            for _, d in pairs(ESPCache) do
+                destroyDrawings(d)
+            end
+            ESPCache = {}
+            return oldUnload(s, ...)
+        end
+    end
+
+    -- ============================================================
+    -- ANCHORED 3D ESP PREVIEW PANEL (Matches Menu Height & Theme)
+    -- ============================================================
     local espPreviewPanel = nil
     local espPreviewCamera = nil
     local espViewport = nil
+    local worldModel = nil
+    local rotY = 0
+    local rotX = 0
+    local isMouseDown = false
+    local lastMousePos = Vector2.new()
+
+    -- Helper to find Linoria's main window frame
+    local function getMainFrame()
+        if not Library.ScreenGui then return nil end
+        for _, child in ipairs(Library.ScreenGui:GetChildren()) do
+            if child:IsA("Frame") and child.Name ~= "KeybindFrame" and child.Name ~= "MounxKB" and child.Name ~= "WatermarkOuter" and child.Name ~= "ESPPreviewPanel" then
+                if child:FindFirstChild("TabContainer", true) or child.Size.Y.Offset > 250 then
+                    return child
+                end
+            end
+        end
+        return nil
+    end
+
+    local function populatePreviewCharacter()
+        if not worldModel then return end
+        worldModel:ClearAllChildren()
+
+        local char = LocalPlayer and LocalPlayer.Character
+        if char then
+            pcall(function()
+                char.Archivable = true
+                local clone = char:Clone()
+                if not clone then return end
+                clone.Archivable = true
+
+                for _, v in ipairs(clone:GetDescendants()) do
+                    if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("Sound") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
+                        pcall(function() v:Destroy() end)
+                    elseif v:IsA("BasePart") then
+                        v.Anchored = true
+                        v.CanCollide = false
+                    end
+                end
+
+                local root = clone:FindFirstChild("HumanoidRootPart") or clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart")
+                if root then
+                    local offset = root.CFrame
+                    for _, part in ipairs(clone:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CFrame = offset:ToObjectSpace(part.CFrame)
+                        end
+                    end
+                end
+                clone.Parent = worldModel
+            end)
+        end
+
+        -- Add stylish Dummy NPC to the side so user previews both targets
+        pcall(function()
+            local dummy = Instance.new("Model")
+            dummy.Name = "Dummy_NPC"
+
+            local dRoot = Instance.new("Part")
+            dRoot.Name = "HumanoidRootPart"
+            dRoot.Size = Vector3.new(2, 2, 1)
+            dRoot.CFrame = CFrame.new(3.0, 0, 0)
+            dRoot.Anchored = true
+            dRoot.CanCollide = false
+            dRoot.Color = Color3.fromRGB(60, 65, 80)
+            dRoot.Material = Enum.Material.SmoothPlastic
+            dRoot.Parent = dummy
+
+            local dTorso = Instance.new("Part")
+            dTorso.Name = "Torso"
+            dTorso.Size = Vector3.new(2, 2, 1)
+            dTorso.CFrame = dRoot.CFrame
+            dTorso.Anchored = true
+            dTorso.CanCollide = false
+            dTorso.Color = Color3.fromRGB(50, 55, 70)
+            dTorso.Material = Enum.Material.SmoothPlastic
+            dTorso.Parent = dummy
+
+            local dHead = Instance.new("Part")
+            dHead.Name = "Head"
+            dHead.Size = Vector3.new(1.2, 1.2, 1.2)
+            dHead.CFrame = dRoot.CFrame * CFrame.new(0, 1.5, 0)
+            dHead.Anchored = true
+            dHead.CanCollide = false
+            dHead.Color = Color3.fromRGB(180, 150, 120)
+            dHead.Material = Enum.Material.SmoothPlastic
+            dHead.Parent = dummy
+
+            local dHum = Instance.new("Humanoid")
+            dHum.Parent = dummy
+            dummy.Parent = worldModel
+        end)
+    end
 
     local function createESPPreview()
         if espPreviewPanel then return end
-
         local gui = Library.ScreenGui
+        if not gui then return end
 
+        local mainWin = getMainFrame()
+        local winHeight = mainWin and mainWin.AbsoluteSize.Y or 450
+        local previewW = 240
+
+        -- Outer Panel (anchored to main window)
         espPreviewPanel = Instance.new("Frame")
         espPreviewPanel.Name = "ESPPreviewPanel"
-        espPreviewPanel.Size = UDim2.new(0, 260, 0, 340)
+        espPreviewPanel.Size = UDim2.new(0, previewW, 0, winHeight)
         espPreviewPanel.BackgroundColor3 = Color3.fromRGB(14, 11, 18)
         espPreviewPanel.BorderSizePixel = 0
         espPreviewPanel.Visible = false
         espPreviewPanel.ZIndex = 500
+        espPreviewPanel.ClipsDescendants = true
         espPreviewPanel.Parent = gui
 
         local panelCorner = Instance.new("UICorner")
@@ -1934,12 +2596,15 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         panelStroke.Parent = espPreviewPanel
         Library:AddToRegistry(panelStroke, { Color = "AccentColor" })
 
+        -- Top accent line
         local topBar = Instance.new("Frame")
+        topBar.Name = "TopBar"
         topBar.Size = UDim2.new(1, 0, 0, 2)
         topBar.BorderSizePixel = 0
-        topBar.ZIndex = 501
+        topBar.ZIndex = 502
         topBar.Parent = espPreviewPanel
         Library:AddToRegistry(topBar, { BackgroundColor3 = "AccentColor" })
+
         local tbGrad = Instance.new("UIGradient")
         tbGrad.Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 1),
@@ -1950,130 +2615,111 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         })
         tbGrad.Parent = topBar
 
+        -- Title bar
         local titleBar = Instance.new("Frame")
-        titleBar.Size = UDim2.new(1, 0, 0, 28)
+        titleBar.Name = "TitleBar"
+        titleBar.Size = UDim2.new(1, 0, 0, 30)
         titleBar.Position = UDim2.new(0, 0, 0, 2)
         titleBar.BackgroundColor3 = Color3.fromRGB(20, 16, 26)
-        titleBar.BackgroundTransparency = 0.3
+        titleBar.BackgroundTransparency = 0.4
         titleBar.BorderSizePixel = 0
         titleBar.ZIndex = 501
         titleBar.Parent = espPreviewPanel
 
+        -- Pulsing title dot
+        local titleDot = Instance.new("Frame")
+        titleDot.Name = "Dot"
+        titleDot.BackgroundColor3 = Library.AccentColor
+        titleDot.Size = UDim2.new(0, 6, 0, 6)
+        titleDot.Position = UDim2.new(0, 10, 0.5, -3)
+        titleDot.BorderSizePixel = 0
+        titleDot.ZIndex = 503
+        titleDot.Parent = titleBar
+        local dotCorner = Instance.new("UICorner")
+        dotCorner.CornerRadius = UDim.new(1, 0)
+        dotCorner.Parent = titleDot
+        Library:AddToRegistry(titleDot, { BackgroundColor3 = "AccentColor" })
+
         local titleLabel = Instance.new("TextLabel")
-        titleLabel.Size = UDim2.new(1, -10, 1, 0)
-        titleLabel.Position = UDim2.new(0, 10, 0, 0)
+        titleLabel.Size = UDim2.new(1, -26, 1, 0)
+        titleLabel.Position = UDim2.new(0, 24, 0, 0)
         titleLabel.BackgroundTransparency = 1
         titleLabel.Font = Enum.Font.GothamBold
-        titleLabel.TextSize = 11
+        titleLabel.TextSize = 12
         titleLabel.TextXAlignment = Enum.TextXAlignment.Left
         titleLabel.Text = "ESP Preview"
-        titleLabel.ZIndex = 502
+        titleLabel.TextColor3 = Color3.fromRGB(245, 240, 250)
+        titleLabel.ZIndex = 503
         titleLabel.Parent = titleBar
-        Library:AddToRegistry(titleLabel, { TextColor3 = "FontColor" })
 
+        -- Hint at the bottom: 3D interactive rotation
+        local hintLabel = Instance.new("TextLabel")
+        hintLabel.Size = UDim2.new(1, 0, 0, 16)
+        hintLabel.Position = UDim2.new(0, 0, 1, -18)
+        hintLabel.BackgroundTransparency = 1
+        hintLabel.Font = Enum.Font.Gotham
+        hintLabel.TextSize = 9
+        hintLabel.TextColor3 = Color3.fromRGB(110, 100, 130)
+        hintLabel.Text = "Click & drag to rotate 3D view"
+        hintLabel.ZIndex = 503
+        hintLabel.Parent = espPreviewPanel
+
+        -- Viewport Frame
         espViewport = Instance.new("ViewportFrame")
-        espViewport.Size = UDim2.new(1, -12, 1, -38)
-        espViewport.Position = UDim2.new(0, 6, 0, 32)
+        espViewport.Size = UDim2.new(1, -12, 1, -54)
+        espViewport.Position = UDim2.new(0, 6, 0, 34)
         espViewport.BackgroundColor3 = Color3.fromRGB(10, 8, 14)
         espViewport.BackgroundTransparency = 0
         espViewport.BorderSizePixel = 0
         espViewport.ZIndex = 501
-        espViewport.Ambient = Color3.fromRGB(180, 160, 200)
-        espViewport.LightColor = Color3.fromRGB(255, 240, 255)
-        espViewport.LightDirection = Vector3.new(-1, -2, -1)
+        espViewport.Ambient = Color3.fromRGB(220, 220, 225)
+        espViewport.LightColor = Color3.fromRGB(255, 255, 255)
+        espViewport.LightDirection = Vector3.new(-1, -1.5, -1)
         espViewport.Parent = espPreviewPanel
 
         local vpCorner = Instance.new("UICorner")
         vpCorner.CornerRadius = UDim.new(0, 6)
         vpCorner.Parent = espViewport
 
+        worldModel = Instance.new("WorldModel")
+        worldModel.Parent = espViewport
+
         espPreviewCamera = Instance.new("Camera")
         espPreviewCamera.FieldOfView = 50
         espPreviewCamera.Parent = espViewport
         espViewport.CurrentCamera = espPreviewCamera
 
-        local lp = game.Players.LocalPlayer
-        local char = lp and lp.Character
-        pcall(function()
-            if not char then return end
-            local clone = char:Clone()
-            if not clone then return end
-            -- Remove scripts/particles so the clone is static
-            pcall(function()
-                for _, v in ipairs(clone:GetDescendants()) do
-                    if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
-                        pcall(function() v:Destroy() end)
-                    end
-                end
-            end)
-            -- Freeze all parts
-            pcall(function()
-                for _, v in ipairs(clone:GetDescendants()) do
-                    if v:IsA("BasePart") then
-                        v.Anchored = true
-                        v.CanCollide = false
-                    end
-                end
-            end)
-            clone.Parent = espViewport
+        populatePreviewCharacter()
 
-            local rootPart = clone:FindFirstChild("HumanoidRootPart") or clone:FindFirstChildWhichIsA("BasePart")
-            if rootPart then
-                local cf = rootPart.CFrame
-                espPreviewCamera.CFrame = CFrame.new(cf.Position + Vector3.new(3, 1.5, 5), cf.Position + Vector3.new(0, 0.5, 0))
-            end
-
-            -- Fake NPC stand-in
-            local npcModel = Instance.new("Model")
-            npcModel.Name = "NPC_Preview"
-            local npcPart = Instance.new("Part")
-            npcPart.Size = Vector3.new(2, 5, 1)
-            npcPart.Anchored = true
-            npcPart.CanCollide = false
-            npcPart.BrickColor = BrickColor.new("Medium stone grey")
-            if rootPart then
-                npcPart.CFrame = rootPart.CFrame * CFrame.new(4, 0, 0)
-            end
-            npcPart.Parent = npcModel
-            local npcHead = Instance.new("Part")
-            npcHead.Size = Vector3.new(1.2, 1.2, 1.2)
-            npcHead.Anchored = true
-            npcHead.CanCollide = false
-            npcHead.BrickColor = BrickColor.new("Pastel brown")
-            npcHead.CFrame = npcPart.CFrame * CFrame.new(0, 3.1, 0)
-            npcHead.Parent = npcModel
-            npcModel.Parent = espViewport
-        end) -- end pcall(function()
-
-        local function positionPanel()
-            pcall(function()
-                local mainWin = Library.ScreenGui:FindFirstChildWhichIsA("Frame", true)
-                if mainWin then
-                    espPreviewPanel.Position = UDim2.new(0, mainWin.AbsolutePosition.X + mainWin.AbsoluteSize.X + 8, 0, mainWin.AbsolutePosition.Y)
-                else
-                    espPreviewPanel.Position = UDim2.new(0.6, 10, 0.1, 0)
+        -- Auto-refresh if local character respawns
+        if LocalPlayer then
+            LocalPlayer.CharacterAdded:Connect(function()
+                task.wait(0.6)
+                if espPreviewPanel and espPreviewPanel.Parent then
+                    populatePreviewCharacter()
                 end
             end)
         end
-        positionPanel()
 
-        local dragging, dragStart, startPos = false, nil, nil
-        titleBar.InputBegan:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                dragStart = inp.Position
-                startPos = espPreviewPanel.Position
+        -- Interactive 3D mouse drag to rotate character view
+        espViewport.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                isMouseDown = true
+                lastMousePos = Vector2.new(input.Position.X, input.Position.Y)
             end
         end)
-        game:GetService("UserInputService").InputChanged:Connect(function(inp)
-            if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
-                local delta = inp.Position - dragStart
-                espPreviewPanel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        UIS.InputChanged:Connect(function(input)
+            if isMouseDown and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local currentPos = Vector2.new(input.Position.X, input.Position.Y)
+                local delta = currentPos - lastMousePos
+                rotY = rotY + delta.X * 0.015
+                rotX = math.clamp(rotX + delta.Y * 0.015, -0.4, 0.4)
+                lastMousePos = currentPos
             end
         end)
-        game:GetService("UserInputService").InputEnded:Connect(function(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
+        UIS.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                isMouseDown = false
             end
         end)
     end
@@ -2084,15 +2730,60 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             espPreviewPanel = nil
             espPreviewCamera = nil
             espViewport = nil
+            worldModel = nil
         end
     end
 
+    -- Toggle hook
     Library.Toggles.ESPPreviewToggle:OnChanged(function(v)
         if v then
             createESPPreview()
-            if espPreviewPanel then espPreviewPanel.Visible = true end
         else
             destroyESPPreview()
+        end
+    end)
+
+    -- Anchor & Camera update loop for ESP Preview (runs in RenderStepped)
+    RunService.RenderStepped:Connect(function()
+        if not espPreviewPanel or not espPreviewPanel.Parent then return end
+
+        local mainWin = getMainFrame()
+        local isMenuOpen = Library.Toggled and (mainWin and mainWin.Visible) and Library.ScreenGui.Enabled
+        local isToggleOn = Library.Toggles.ESPPreviewToggle and Library.Toggles.ESPPreviewToggle.Value
+
+        if not (isMenuOpen and isToggleOn) then
+            espPreviewPanel.Visible = false
+            return
+        end
+
+        espPreviewPanel.Visible = true
+
+        -- Match main window height & anchor right next to it with 8px gap
+        local mainPos = mainWin.AbsolutePosition
+        local mainSize = mainWin.AbsoluteSize
+        local previewW = math.clamp(math.floor(mainSize.X * 0.42), 220, 260)
+        local gap = 8
+
+        local targetX = mainPos.X + mainSize.X + gap
+        -- Responsive check for narrow screens / mobile: flip to left side if no space on right
+        if targetX + previewW > Camera.ViewportSize.X - 10 then
+            targetX = math.max(10, mainPos.X - previewW - gap)
+        end
+
+        espPreviewPanel.Position = UDim2.new(0, targetX, 0, mainPos.Y)
+        espPreviewPanel.Size = UDim2.new(0, previewW, 0, mainSize.Y)
+
+        -- 3D Camera Orbit & Rotation
+        if not isMouseDown then
+            rotY = rotY + 0.01 -- Smooth idle spin
+        end
+        if espPreviewCamera then
+            local camDist = 8.5
+            local camY = math.sin(rotX) * camDist
+            local camPlane = math.cos(rotX) * camDist
+            local camX = math.sin(rotY) * camPlane
+            local camZ = math.cos(rotY) * camPlane
+            espPreviewCamera.CFrame = CFrame.new(Vector3.new(camX, camY + 0.5, camZ), Vector3.new(0.8, 0, 0))
         end
     end)
 end
