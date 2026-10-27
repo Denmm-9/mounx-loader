@@ -24,6 +24,82 @@ MounxHub.Library = Library
 MounxHub.ThemeManager = ThemeManager
 MounxHub.SaveManager = SaveManager
 
+local activeMenuFont = Enum.Font.Arimo
+local activeDrawingFont = 0
+
+-- Global Window & Tab Groupbox wrapper: ensures AddDivider, AddColorPicker, AddDependencyBox,
+-- and automatically places an AddDivider() right below each groupbox title!
+local origCreateWindow = Library.CreateWindow
+Library.CreateWindow = function(self, ...)
+    local window = origCreateWindow(self, ...)
+    local origAddTab = window.AddTab
+    window.AddTab = function(wSelf, tabName, ...)
+        local tab = origAddTab(wSelf, tabName, ...)
+        local origLeft = tab.AddLeftGroupbox
+        local origRight = tab.AddRightGroupbox
+
+        local function enhanceGB(gb)
+            if not gb then return gb end
+
+            if not gb.AddColorPicker then
+                gb.AddColorPicker = function(s, id, info)
+                    local lbl = s:AddLabel((info and (info.Text or info.Title)) or id)
+                    return lbl:AddColorPicker(id, info)
+                end
+            end
+
+            if not gb.AddDivider then
+                gb.AddDivider = function(s)
+                    local div = Instance.new("Frame")
+                    div.Name = "Divider"
+                    div.Size = UDim2.new(1, 0, 0, 1)
+                    div.BorderSizePixel = 0
+                    div.BackgroundColor3 = Library.OutlineColor or Color3.fromRGB(35, 35, 45)
+                    div.Parent = s.Container
+                    pcall(function() Library:AddToRegistry(div, { BackgroundColor3 = "OutlineColor" }) end)
+                    if s.Resize then s:Resize() end
+                    return div
+                end
+            end
+
+            local origDep = gb.AddDependencyBox
+            if origDep then
+                gb.AddDependencyBox = function(s, ...)
+                    local dep = origDep(s, ...)
+                    if type(dep) == "table" and not dep.SetVisible then
+                        dep.SetVisible = function(dSelf, vis)
+                            pcall(function()
+                                if dSelf.Container and dSelf.Container.Parent then
+                                    dSelf.Container.Parent.Visible = vis
+                                end
+                            end)
+                            pcall(function() if dSelf.Resize then dSelf:Resize() end end)
+                        end
+                    end
+                    return dep
+                end
+            end
+
+            -- Automatically add divider right under the groupbox title!
+            if not gb._mounxEnhanced then
+                gb._mounxEnhanced = true
+                pcall(function() gb:AddDivider() end)
+            end
+
+            return gb
+        end
+
+        tab.AddLeftGroupbox = function(tSelf, ...)
+            return enhanceGB(origLeft(tSelf, ...))
+        end
+        tab.AddRightGroupbox = function(tSelf, ...)
+            return enhanceGB(origRight(tSelf, ...))
+        end
+        return tab
+    end
+    return window
+end
+
 local UIS = game:GetService("UserInputService")
 local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
 
@@ -1451,10 +1527,17 @@ local function ApplyMounxStyle(Library)
                             if v:IsA("Frame") and v.BackgroundTransparency == 1 then
                                 local list = v:FindFirstChildWhichIsA("UIListLayout")
                                 if list and (list.VerticalAlignment == Enum.VerticalAlignment.Bottom or list.VerticalAlignment == Enum.VerticalAlignment.Top) then
-                                    v.Position = UDim2.new(1, -15, 0, 15)
-                                    v.AnchorPoint = Vector2.new(1, 0)
+                                    local notifSide = (Library.Options and Library.Options.NotifPositionDrop and Library.Options.NotifPositionDrop.Value) or "Left"
+                                    if notifSide == "Right" then
+                                        v.Position = UDim2.new(1, -15, 0, 15)
+                                        v.AnchorPoint = Vector2.new(1, 0)
+                                        list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+                                    else
+                                        v.Position = UDim2.new(0, 15, 0, 15)
+                                        v.AnchorPoint = Vector2.new(0, 0)
+                                        list.HorizontalAlignment = Enum.HorizontalAlignment.Left
+                                    end
                                     list.VerticalAlignment = Enum.VerticalAlignment.Top
-                                    list.HorizontalAlignment = Enum.HorizontalAlignment.Right
                                 end
                             end
                         end
@@ -1560,6 +1643,8 @@ function MounxHub:BuildServerTab(ServerTab)
         end
     end)
     
+    SrvMiscBox:AddDivider()
+
     SrvMiscBox:AddToggle('AutoExecuteTPMounx', { Text = 'Auto-Execute on TP', Default = false, Tooltip = 'Automatically injects the script when changing servers.' })
     Library.Toggles.AutoExecuteTPMounx:OnChanged(function()
         if Library.Toggles.AutoExecuteTPMounx.Value then
@@ -1607,14 +1692,10 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     -- =====================
     local InterfaceGroup = SettingsTab:AddLeftGroupbox('Interface')
 
-    InterfaceGroup:AddDropdown('NotifPositionDrop', {
-        Text = 'Notification Side', Values = { 'Right', 'Left' }, Default = 2, Multi = false,
-        Tooltip = 'Side of the screen where notifications appear'
-    })
-    Library.Options.NotifPositionDrop:OnChanged(function()
-        local side = Library.Options.NotifPositionDrop.Value
+    local function applyNotifSide(side)
         pcall(function()
             local gui = Library.ScreenGui
+            if not gui then return end
             for _, v in ipairs(gui:GetChildren()) do
                 if v:IsA("Frame") and v.BackgroundTransparency == 1 then
                     local list = v:FindFirstChildWhichIsA("UIListLayout")
@@ -1632,30 +1713,67 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
                 end
             end
         end)
-    end)
+    end
 
-    InterfaceGroup:AddDivider()
-    
-    InterfaceGroup:AddDropdown('MenuFontDrop', {
-        Text = 'Menu Font', Default = 1, Multi = false,
-        Values = { 'GothamBold', 'Gotham', 'GothamMedium', 'GothamSemibold', 'Arimo', 'Ubuntu', 'Code' },
-        Tooltip = 'Changes the font of all text in the menu'
+    InterfaceGroup:AddDropdown('NotifPositionDrop', {
+        Text = 'Notification Side', Values = { 'Left', 'Right' }, Default = 1, Multi = false,
+        Tooltip = 'Side of the screen where notifications appear'
     })
-    Library.Options.MenuFontDrop:OnChanged(function()
-        local fontName = Library.Options.MenuFontDrop.Value
+    Library.Options.NotifPositionDrop:OnChanged(function()
+        applyNotifSide(Library.Options.NotifPositionDrop.Value)
+    end)
+    applyNotifSide("Left")
+
+    local function applyFontGlobally(fontName)
         local ok, font = pcall(function() return Enum.Font[fontName] end)
-        if not ok or not font then font = Enum.Font.GothamBold end
+        if not ok or not font then font = Enum.Font.Arimo end
+        activeMenuFont = font
+        activeDrawingFont = (fontName == "Code") and 3 or 0
+
         pcall(function()
-            for _, v in ipairs(Library.ScreenGui:GetDescendants()) do
-                if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then
-                    pcall(function() v.Font = font end)
+            if Library.ScreenGui then
+                for _, v in ipairs(Library.ScreenGui:GetDescendants()) do
+                    if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then
+                        pcall(function() v.Font = font end)
+                    end
                 end
             end
         end)
+
+        pcall(function()
+            if espPreviewPanel then
+                for _, v in ipairs(espPreviewPanel:GetDescendants()) do
+                    if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then
+                        pcall(function() v.Font = font end)
+                    end
+                end
+            end
+        end)
+
+        pcall(function()
+            if espElements then
+                for _, d in pairs(espElements) do
+                    if d.healthText then pcall(function() d.healthText.Font = activeDrawingFont end) end
+                    if d.nameText then pcall(function() d.nameText.Font = activeDrawingFont end) end
+                    if d.distText then pcall(function() d.distText.Font = activeDrawingFont end) end
+                    if d.weaponText then pcall(function() d.weaponText.Font = activeDrawingFont end) end
+                end
+            end
+        end)
+    end
+
+    InterfaceGroup:AddDropdown('MenuFontDrop', {
+        Text = 'Menu Font', Default = 1, Multi = false,
+        Values = { 'Arimo', 'Gotham', 'GothamBold', 'GothamMedium', 'GothamSemibold', 'Ubuntu', 'Code' },
+        Tooltip = 'Changes the font of all text in the menu'
+    })
+    Library.Options.MenuFontDrop:OnChanged(function()
+        applyFontGlobally(Library.Options.MenuFontDrop.Value)
     end)
+    applyFontGlobally("Arimo")
 
     InterfaceGroup:AddDivider()
-    
+
     InterfaceGroup:AddToggle('AutoReExecToggle', {
         Text = 'Auto Re-Execute on Teleport', Default = false,
         Tooltip = 'Automatically re-runs your script after any teleport (queues with queue_on_teleport)'
@@ -1846,9 +1964,6 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     -- =============================================
     -- Left: ESP groupbox
     -- =============================================
-    -- =============================================
-    -- Left: ESP groupbox
-    -- =============================================
     local ESPGroup = VisualsTab:AddLeftGroupbox('ESP')
 
     ESPGroup:AddToggle('ESPEnabled', { Text = 'Enable ESP', Default = false })
@@ -1858,7 +1973,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     })
 
     ESPGroup:AddDropdown('BoxStyle', {
-        Text = 'Box Style', Values = { '2D Box', '3D Box', 'Corner Box', 'Full Box' }, Default = 1, Multi = false
+        Text = 'Box Style', Values = { 'Full Box', 'Corner', '3D' }, Default = 1, Multi = false
     })
 
     ESPGroup:AddSlider('ESPMaxDist', {
@@ -1874,6 +1989,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     BoxSettingsGroup:AddSlider('BoxFillTransparency', {
         Text = 'Fill Transparency', Min = 0, Max = 1, Default = 0.5, Rounding = 1
     })
+    BoxSettingsGroup:AddDivider()
     BoxSettingsGroup:AddColorPicker('BoxColorPlayers', {
         Text = 'Player Box Color', Default = Color3.fromRGB(255, 100, 100)
     })
@@ -1890,6 +2006,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     TextGroup:AddToggle('DistanceESP',   { Text = 'Distance',    Default = false })
     TextGroup:AddToggle('WeaponESP',     { Text = 'Equipped Tool/Weapon', Default = false })
     TextGroup:AddToggle('HeadDotESP',    { Text = 'Head Dot',    Default = false })
+    TextGroup:AddDivider()
     TextGroup:AddColorPicker('TextColor', {
         Text = 'Text Color', Default = Color3.fromRGB(255, 255, 255)
     })
@@ -1905,6 +2022,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     HealthBarGroup:AddToggle('HealthBarESP',        { Text = 'Health Bar',         Default = false })
     HealthBarGroup:AddToggle('HealthBarColorBased', { Text = 'Color Based',        Default = true, Tooltip = 'Dynamically transitions green -> yellow -> red based on HP' })
     HealthBarGroup:AddToggle('HealthBarText',       { Text = 'Show Health Value',  Default = false })
+    HealthBarGroup:AddDivider()
     HealthBarGroup:AddColorPicker('HealthBarColor', {
         Text = 'Custom Bar Color', Default = Color3.fromRGB(0, 255, 100)
     })
@@ -1918,6 +2036,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     TracerGroup:AddDropdown('TracerOrigin', {
         Text = 'Origin', Values = { 'Bottom', 'Center', 'Top', 'Mouse' }, Default = 1, Multi = false
     })
+    TracerGroup:AddDivider()
     TracerGroup:AddColorPicker('TracerColor', {
         Text = 'Tracer Color', Default = Color3.fromRGB(255, 107, 157)
     })
@@ -1928,6 +2047,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     local ChamsGroup = VisualsTab:AddRightGroupbox('Chams')
 
     ChamsGroup:AddToggle('ChamsESP', { Text = 'Chams', Default = false })
+    ChamsGroup:AddDivider()
     ChamsGroup:AddColorPicker('ChamsColorVisible', {
         Text = 'Visible Color', Default = Color3.fromRGB(255, 107, 157)
     })
@@ -1941,6 +2061,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     local ArrowGroup = VisualsTab:AddRightGroupbox('Off-Screen Arrow')
 
     ArrowGroup:AddToggle('ArrowESP', { Text = 'Arrow', Default = false })
+    ArrowGroup:AddDivider()
     ArrowGroup:AddColorPicker('ArrowColor', {
         Text = 'Arrow Color', Default = Color3.fromRGB(255, 255, 255)
     })
@@ -2191,7 +2312,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         end
 
         local targetMode = Library.Options.ESPTarget and Library.Options.ESPTarget.Value or "Players"
-        local boxStyle = Library.Options.BoxStyle and Library.Options.BoxStyle.Value or "2D Box"
+        local boxStyle = Library.Options.BoxStyle and Library.Options.BoxStyle.Value or "Full Box"
         local boxFilled = Library.Toggles.BoxFilled and Library.Toggles.BoxFilled.Value
         local fillTrans = Library.Options.BoxFillTransparency and Library.Options.BoxFillTransparency.Value or 0.5
         local textColor = Library.Options.TextColor and Library.Options.TextColor.Value or Color3.fromRGB(255, 255, 255)
@@ -2310,7 +2431,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                             d.boxOutline.Size = Vector2.new(boxWidth + 2, boxHeight + 2)
                             d.boxOutline.Position = Vector2.new(boxX - 1, boxY - 1)
 
-                        elseif boxStyle == "Corner Box" then
+                        elseif boxStyle == "Corner" or boxStyle == "Corner Box" then
                             -- Corner Box WITH FILLED SUPPORT!
                             if d.box3D then for _, l in ipairs(d.box3D) do l.Visible = false end end
 
@@ -2353,23 +2474,26 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                                 end
                             end
 
-                        elseif boxStyle == "3D Box" then
+                        elseif boxStyle == "3D" or boxStyle == "3D Box" then
                             d.box.Visible = false
                             d.boxOutline.Visible = false
                             if d.corners then for _, l in ipairs(d.corners) do l.Visible = false end end
                             if d.cornerOutlines then for _, l in ipairs(d.cornerOutlines) do l.Visible = false end end
 
                             local cf = root.CFrame
-                            local sx, sy, sz = 1.8, 2.8, 1.2
+                            local midY = -0.45
+                            local sx, sy, sz = 1.65, 2.5, 1.2
+                            local yTop = midY + sy
+                            local yBot = midY - sy
                             local pts = {
-                                cf * Vector3.new(-sx,  sy, -sz),
-                                cf * Vector3.new( sx,  sy, -sz),
-                                cf * Vector3.new( sx, -sy, -sz),
-                                cf * Vector3.new(-sx, -sy, -sz),
-                                cf * Vector3.new(-sx,  sy,  sz),
-                                cf * Vector3.new( sx,  sy,  sz),
-                                cf * Vector3.new( sx, -sy,  sz),
-                                cf * Vector3.new(-sx, -sy,  sz),
+                                cf * Vector3.new(-sx, yTop, -sz),
+                                cf * Vector3.new( sx, yTop, -sz),
+                                cf * Vector3.new( sx, yBot, -sz),
+                                cf * Vector3.new(-sx, yBot, -sz),
+                                cf * Vector3.new(-sx, yTop,  sz),
+                                cf * Vector3.new( sx, yTop,  sz),
+                                cf * Vector3.new( sx, yBot,  sz),
+                                cf * Vector3.new(-sx, yBot,  sz),
                             }
                             local sPts = {}
                             local allVis = true
@@ -2766,11 +2890,12 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         local mainWin = getMainFrame()
         local winHeight = mainWin and mainWin.AbsoluteSize.Y or 460
         local previewW = 315 -- Compact & perfectly proportioned preview window!
+        local previewH = math.clamp(math.floor(winHeight * 0.80), 330, 400)
 
-        -- Outer Panel (anchored to main window, themed accent border)
+        -- Outer Panel (anchored to main window, themed accent border, compact height)
         espPreviewPanel = Instance.new("Frame")
         espPreviewPanel.Name = "ESPPreviewPanel"
-        espPreviewPanel.Size = UDim2.new(0, previewW, 0, winHeight)
+        espPreviewPanel.Size = UDim2.new(0, previewW, 0, previewH)
         espPreviewPanel.BackgroundColor3 = Color3.fromRGB(14, 11, 18)
         espPreviewPanel.BorderSizePixel = 0
         espPreviewPanel.Visible = false
@@ -2839,7 +2964,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         titleLabel.Size = UDim2.new(1, -28, 1, 0)
         titleLabel.Position = UDim2.new(0, 26, 0, 0)
         titleLabel.BackgroundTransparency = 1
-        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.Font = activeMenuFont
         titleLabel.TextSize = 13
         titleLabel.TextXAlignment = Enum.TextXAlignment.Left
         titleLabel.Text = "ESP Preview"
@@ -2852,7 +2977,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         hintLabel.Size = UDim2.new(1, 0, 0, 18)
         hintLabel.Position = UDim2.new(0, 0, 1, -20)
         hintLabel.BackgroundTransparency = 1
-        hintLabel.Font = Enum.Font.Gotham
+        hintLabel.Font = activeMenuFont
         hintLabel.TextSize = 10
         hintLabel.TextColor3 = Color3.fromRGB(130, 120, 150)
         hintLabel.Text = "Drag on viewport to manually rotate in 3D"
@@ -2976,7 +3101,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         pvHealthText = Instance.new("TextLabel")
         pvHealthText.Name = "PreviewHPText"
         pvHealthText.BackgroundTransparency = 1
-        pvHealthText.Font = Enum.Font.GothamBold
+        pvHealthText.Font = activeMenuFont
         pvHealthText.TextSize = 10
         pvHealthText.TextXAlignment = Enum.TextXAlignment.Right
         pvHealthText.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -2991,7 +3116,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         pvNameText = Instance.new("TextLabel")
         pvNameText.Name = "PreviewNameText"
         pvNameText.BackgroundTransparency = 1
-        pvNameText.Font = Enum.Font.GothamBold
+        pvNameText.Font = activeMenuFont
         pvNameText.TextSize = 12
         pvNameText.TextColor3 = Color3.fromRGB(255, 255, 255)
         pvNameText.TextStrokeTransparency = 0
@@ -3005,7 +3130,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         pvDistText = Instance.new("TextLabel")
         pvDistText.Name = "PreviewDistText"
         pvDistText.BackgroundTransparency = 1
-        pvDistText.Font = Enum.Font.Gotham
+        pvDistText.Font = activeMenuFont
         pvDistText.TextSize = 10
         pvDistText.TextColor3 = Color3.fromRGB(255, 255, 255)
         pvDistText.TextStrokeTransparency = 0
@@ -3019,7 +3144,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         pvWeaponText = Instance.new("TextLabel")
         pvWeaponText.Name = "PreviewWeaponText"
         pvWeaponText.BackgroundTransparency = 1
-        pvWeaponText.Font = Enum.Font.Gotham
+        pvWeaponText.Font = activeMenuFont
         pvWeaponText.TextSize = 10
         pvWeaponText.TextColor3 = Color3.fromRGB(255, 255, 255)
         pvWeaponText.TextStrokeTransparency = 0
@@ -3124,10 +3249,11 @@ function MounxHub:BuildVisuals(VisualsTab, options)
 
         espPreviewPanel.Visible = true
 
-        -- Match main window height & anchor right next to it with 8px gap
+        -- Match main window position & anchor right next to it with 8px gap, compact height
         local mainPos = mainWin.AbsolutePosition
         local mainSize = mainWin.AbsoluteSize
         local previewW = math.clamp(math.floor(mainSize.X * 0.52), 295, 335)
+        local previewH = math.clamp(math.floor(mainSize.Y * 0.80), 330, 400)
         local gap = 8
 
         local targetX = mainPos.X + mainSize.X + gap
@@ -3142,18 +3268,18 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         end
 
         espPreviewPanel.Position = UDim2.new(0, targetX, 0, mainPos.Y)
-        espPreviewPanel.Size = UDim2.new(0, previewW, 0, mainSize.Y)
+        espPreviewPanel.Size = UDim2.new(0, previewW, 0, previewH)
 
         -- 3D Camera Orbit & Rotation (Manual only, default looking straight from front!)
-        -- camDist = 11.2 provides full head-to-toe framing with wide side margins
+        -- camDist = 10.4 provides full head-to-toe framing with wide side margins in compact height
         if espPreviewCamera then
-            local camDist = 11.2
+            local camDist = 10.4
             local camY = math.sin(rotX) * camDist
             local camPlane = math.cos(rotX) * camDist
             local camX = math.sin(rotY) * camPlane
             local camZ = math.cos(rotY) * camPlane
-            -- Target is center of the character, perfectly framed!
-            espPreviewCamera.CFrame = CFrame.new(Vector3.new(camX, camY + 0.1, camZ), Vector3.new(0, -0.1, 0))
+            -- Target is midY of character (-0.35), perfectly framed!
+            espPreviewCamera.CFrame = CFrame.new(Vector3.new(camX, camY - 0.35, camZ), Vector3.new(0, -0.35, 0))
         end
 
         -- ============================================================
@@ -3246,10 +3372,11 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 end
             end
 
-            local topWorld = Vector3.new(0, maxY + 0.15, 0)
-            local botWorld = Vector3.new(0, minY - 0.1, 0)
-            local leftWorld = Vector3.new(minX - 0.1, 0, 0)
-            local rightWorld = Vector3.new(maxX + 0.1, 0, 0)
+            local midY = (minY + maxY) * 0.5
+            local topWorld = Vector3.new(0, maxY + 0.08, 0)
+            local botWorld = Vector3.new(0, minY - 0.05, 0)
+            local leftWorld = Vector3.new(minX - 0.08, midY, 0)
+            local rightWorld = Vector3.new(maxX + 0.08, midY, 0)
 
             local topScr, tVis = worldToPreviewPoint(topWorld)
             local botScr, bVis = worldToPreviewPoint(botWorld)
@@ -3271,14 +3398,14 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 boxColor = Library.Options.BoxColorPlayers and Library.Options.BoxColorPlayers.Value or Color3.fromRGB(255, 100, 100)
             end
 
-            local boxStyle = Library.Options.BoxStyle and Library.Options.BoxStyle.Value or "2D Box"
+            local boxStyle = Library.Options.BoxStyle and Library.Options.BoxStyle.Value or "Full Box"
             local boxFilled = Library.Toggles.BoxFilled and Library.Toggles.BoxFilled.Value
             local fillTrans = Library.Options.BoxFillTransparency and Library.Options.BoxFillTransparency.Value or 0.5
             local textColor = Library.Options.TextColor and Library.Options.TextColor.Value or Color3.fromRGB(255, 255, 255)
             local textSize = Library.Options.ESPTextSize and Library.Options.ESPTextSize.Value or 13
 
             -- 1. Preview Box & Corners & 3D Box
-            if boxStyle == "2D Box" or boxStyle == "Full Box" then
+            if boxStyle == "Full Box" or boxStyle == "2D Box" then
                 for _, f in ipairs(pvCornerFrames) do f.Visible = false end
                 for _, f in ipairs(pvBox3DFrames) do f.Visible = false end
                 pvBox.Visible = true
@@ -3295,7 +3422,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                     pvBox.BackgroundTransparency = 1
                 end
 
-            elseif boxStyle == "Corner Box" then
+            elseif boxStyle == "Corner" or boxStyle == "Corner Box" then
                 for _, f in ipairs(pvBox3DFrames) do f.Visible = false end
 
                 -- Corner Box Live Preview with BoxFilled support!
@@ -3332,23 +3459,34 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                     end
                 end
 
-            elseif boxStyle == "3D Box" then
+            elseif boxStyle == "3D" or boxStyle == "3D Box" then
                 pvBox.Visible = false
                 for _, f in ipairs(pvCornerFrames) do f.Visible = false end
 
                 -- 3D Box live perspective rendering in Preview!
-                local sx = math.max(1.3, (maxX - minX) * 0.5 + 0.1)
-                local sy = math.max(2.2, (maxY - minY) * 0.5 + 0.1)
-                local sz = 1.1
+                -- Accurately centered around midY so it sits tightly on the character!
+                local midY = (minY + maxY) * 0.5
+                local halfY = (maxY - minY) * 0.5 + 0.08
+                local midX = (minX + maxX) * 0.5
+                local halfX = math.max(1.25, (maxX - minX) * 0.5 + 0.08)
+                local halfZ = 1.05
+
+                local yTop = midY + halfY
+                local yBot = midY - halfY
+                local xLeft = midX - halfX
+                local xRight = midX + halfX
+                local zFront = -halfZ
+                local zBack = halfZ
+
                 local pts3D = {
-                    Vector3.new(-sx,  sy, -sz),
-                    Vector3.new( sx,  sy, -sz),
-                    Vector3.new( sx, -sy, -sz),
-                    Vector3.new(-sx, -sy, -sz),
-                    Vector3.new(-sx,  sy,  sz),
-                    Vector3.new( sx,  sy,  sz),
-                    Vector3.new( sx, -sy,  sz),
-                    Vector3.new(-sx, -sy,  sz),
+                    Vector3.new(xLeft,  yTop, zFront),
+                    Vector3.new(xRight, yTop, zFront),
+                    Vector3.new(xRight, yBot, zFront),
+                    Vector3.new(xLeft,  yBot, zFront),
+                    Vector3.new(xLeft,  yTop, zBack),
+                    Vector3.new(xRight, yTop, zBack),
+                    Vector3.new(xRight, yBot, zBack),
+                    Vector3.new(xLeft,  yBot, zBack),
                 }
                 local sPts = {}
                 for i = 1, 8 do
