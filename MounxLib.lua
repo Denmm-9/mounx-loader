@@ -1594,6 +1594,77 @@ function MounxHub:BuildServerTab(ServerTab)
 end
 
 function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
+    -- =====================
+    -- Interface groupbox (notification side, font, auto re-exec)
+    -- =====================
+    local InterfaceGroup = SettingsTab:AddLeftGroupbox('Interface')
+
+    InterfaceGroup:AddDropdown('NotifPositionDrop', {
+        Text = 'Notification Side', Values = { 'Right', 'Left' }, Default = 1, Multi = false,
+        Tooltip = 'Side of the screen where notifications appear'
+    })
+    Library.Options.NotifPositionDrop:OnChanged(function()
+        local side = Library.Options.NotifPositionDrop.Value
+        pcall(function()
+            local gui = Library.ScreenGui
+            for _, v in ipairs(gui:GetChildren()) do
+                if v:IsA("Frame") and v.BackgroundTransparency == 1 then
+                    local list = v:FindFirstChildWhichIsA("UIListLayout")
+                    if list then
+                        if side == "Right" then
+                            v.AnchorPoint = Vector2.new(1, 0)
+                            v.Position = UDim2.new(1, -15, 0, 15)
+                            list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+                        else
+                            v.AnchorPoint = Vector2.new(0, 0)
+                            v.Position = UDim2.new(0, 15, 0, 15)
+                            list.HorizontalAlignment = Enum.HorizontalAlignment.Left
+                        end
+                    end
+                end
+            end
+        end)
+    end)
+
+    InterfaceGroup:AddDropdown('MenuFontDrop', {
+        Text = 'Menu Font', Default = 1, Multi = false,
+        Values = { 'GothamBold', 'Gotham', 'GothamMedium', 'GothamSemibold', 'Arimo', 'Ubuntu', 'Code' },
+        Tooltip = 'Changes the font of all text in the menu'
+    })
+    Library.Options.MenuFontDrop:OnChanged(function()
+        local fontName = Library.Options.MenuFontDrop.Value
+        local ok, font = pcall(function() return Enum.Font[fontName] end)
+        if not ok or not font then font = Enum.Font.GothamBold end
+        pcall(function()
+            for _, v in ipairs(Library.ScreenGui:GetDescendants()) do
+                if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then
+                    pcall(function() v.Font = font end)
+                end
+            end
+        end)
+    end)
+
+    InterfaceGroup:AddToggle('AutoReExecToggle', {
+        Text = 'Auto Re-Execute on Teleport', Default = false,
+        Tooltip = 'Automatically re-runs your script after any teleport (queues with queue_on_teleport)'
+    })
+    Library.Toggles.AutoReExecToggle:OnChanged(function()
+        if Library.Toggles.AutoReExecToggle.Value then
+            local qot = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport)
+            if qot then
+                local code = getgenv().MounxAutoExecCode or [[
+                    task.wait(3)
+                    pcall(function()
+                        if isfile and isfile("MounxLoader.lua") then
+                            loadstring(readfile("MounxLoader.lua"))()
+                        end
+                    end)
+                ]]
+                pcall(function() qot(code) end)
+            end
+        end
+    end)
+
     local MenuGroup = SettingsTab:AddLeftGroupbox('Menu & Close')
     MenuGroup:AddButton('Unload Script', function() Library:Unload() end)
     MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'X', NoUI = true, Text = 'Menu keybind' })
@@ -1717,6 +1788,299 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         -- AUTOLOAD FIX: Execute at the end to load config if exists
         pcall(function() SaveManager:LoadAutoloadConfig() end)
         pcall(function() Library.ScreenGui.Enabled = true end)
+    end)
+end
+
+function MounxHub:BuildVisuals(VisualsTab, options)
+    -- =============================================
+    -- Left: ESP groupbox
+    -- =============================================
+    local ESPGroup = VisualsTab:AddLeftGroupbox('ESP')
+
+    ESPGroup:AddToggle('ESPEnabled', { Text = 'Enable ESP', Default = false })
+
+    ESPGroup:AddDropdown('ESPTarget', {
+        Text = 'Target', Values = { 'Players', 'NPCs', 'Both' }, Default = 1, Multi = false
+    })
+
+    ESPGroup:AddDropdown('BoxStyle', {
+        Text = 'Box Style', Values = { '2D Box', '3D Box', 'Corner Box', 'Full Box' }, Default = 1, Multi = false
+    })
+
+    -- =============================================
+    -- Left: Box Settings groupbox (DependencyBox on ESPEnabled)
+    -- =============================================
+    local BoxDepBox = ESPGroup:AddDependencyBox()
+    Library.Toggles.ESPEnabled:OnChanged(function(v)
+        BoxDepBox:SetVisible(v)
+    end)
+    BoxDepBox:SetVisible(false)
+
+    local BoxSettingsGroup = VisualsTab:AddLeftGroupbox('Box Settings')
+
+    BoxSettingsGroup:AddToggle('BoxFilled', { Text = 'Filled Box', Default = false })
+    BoxSettingsGroup:AddSlider('BoxFillTransparency', {
+        Text = 'Fill Transparency', Min = 0, Max = 1, Default = 0.5, Rounding = 1
+    })
+    BoxSettingsGroup:AddColorPicker('BoxColorPlayers', {
+        Text = 'Player Box Color', Default = Color3.fromRGB(255, 100, 100)
+    })
+    BoxSettingsGroup:AddColorPicker('BoxColorNPCs', {
+        Text = 'NPC Box Color', Default = Color3.fromRGB(100, 200, 100)
+    })
+
+    -- =============================================
+    -- Left: Text groupbox
+    -- =============================================
+    local TextGroup = VisualsTab:AddLeftGroupbox('Text')
+
+    TextGroup:AddToggle('NameESP',       { Text = 'Name',        Default = false })
+    TextGroup:AddToggle('DistanceESP',   { Text = 'Distance',    Default = false })
+    TextGroup:AddToggle('HealthTextESP', { Text = 'Health Text', Default = false })
+    TextGroup:AddColorPicker('TextColor', {
+        Text = 'Text Color', Default = Color3.fromRGB(255, 255, 255)
+    })
+
+    -- =============================================
+    -- Right: Health Bar groupbox
+    -- =============================================
+    local HealthBarGroup = VisualsTab:AddRightGroupbox('Health Bar')
+
+    HealthBarGroup:AddToggle('HealthBarESP',  { Text = 'Health Bar',    Default = false })
+    HealthBarGroup:AddToggle('HealthBarText', { Text = 'Show HP Value', Default = false })
+    HealthBarGroup:AddColorPicker('HealthBarColor', {
+        Text = 'Bar Color', Default = Color3.fromRGB(0, 255, 100)
+    })
+
+    -- =============================================
+    -- Right: Tracers groupbox
+    -- =============================================
+    local TracerGroup = VisualsTab:AddRightGroupbox('Tracers')
+
+    TracerGroup:AddToggle('TracerESP', { Text = 'Tracers', Default = false })
+    TracerGroup:AddDropdown('TracerOrigin', {
+        Text = 'Origin', Values = { 'Bottom', 'Center', 'Top', 'Mouse' }, Default = 1, Multi = false
+    })
+    TracerGroup:AddColorPicker('TracerColor', {
+        Text = 'Tracer Color', Default = Color3.fromRGB(255, 107, 157)
+    })
+
+    -- =============================================
+    -- Right: Chams groupbox
+    -- =============================================
+    local ChamsGroup = VisualsTab:AddRightGroupbox('Chams')
+
+    ChamsGroup:AddToggle('ChamsESP', { Text = 'Chams', Default = false })
+    ChamsGroup:AddColorPicker('ChamsColorVisible', {
+        Text = 'Visible Color', Default = Color3.fromRGB(255, 107, 157)
+    })
+    ChamsGroup:AddColorPicker('ChamsColorHidden', {
+        Text = 'Hidden Color', Default = Color3.fromRGB(150, 50, 80)
+    })
+
+    -- =============================================
+    -- Right: Off-Screen Arrow groupbox
+    -- =============================================
+    local ArrowGroup = VisualsTab:AddRightGroupbox('Off-Screen Arrow')
+
+    ArrowGroup:AddToggle('ArrowESP', { Text = 'Arrow', Default = false })
+    ArrowGroup:AddColorPicker('ArrowColor', {
+        Text = 'Arrow Color', Default = Color3.fromRGB(255, 255, 255)
+    })
+
+    -- =============================================
+    -- Right: ESP Preview groupbox
+    -- =============================================
+    local PreviewGroup = VisualsTab:AddRightGroupbox('ESP Preview')
+
+    PreviewGroup:AddToggle('ESPPreviewToggle', {
+        Text = 'Show Preview', Default = false,
+        Tooltip = 'Shows a live 3D preview of your character with ESP overlays'
+    })
+
+    -- =============================================
+    -- ESP Preview Panel logic
+    -- =============================================
+    local espPreviewPanel = nil
+    local espPreviewCamera = nil
+    local espViewport = nil
+
+    local function createESPPreview()
+        if espPreviewPanel then return end
+
+        local gui = Library.ScreenGui
+
+        espPreviewPanel = Instance.new("Frame")
+        espPreviewPanel.Name = "ESPPreviewPanel"
+        espPreviewPanel.Size = UDim2.new(0, 260, 0, 340)
+        espPreviewPanel.BackgroundColor3 = Color3.fromRGB(14, 11, 18)
+        espPreviewPanel.BorderSizePixel = 0
+        espPreviewPanel.Visible = false
+        espPreviewPanel.ZIndex = 500
+        espPreviewPanel.Parent = gui
+
+        local panelCorner = Instance.new("UICorner")
+        panelCorner.CornerRadius = UDim.new(0, 10)
+        panelCorner.Parent = espPreviewPanel
+
+        local panelStroke = Instance.new("UIStroke")
+        panelStroke.Thickness = 1
+        panelStroke.Transparency = 0.4
+        panelStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        panelStroke.Parent = espPreviewPanel
+        Library:AddToRegistry(panelStroke, { Color = "AccentColor" })
+
+        local topBar = Instance.new("Frame")
+        topBar.Size = UDim2.new(1, 0, 0, 2)
+        topBar.BorderSizePixel = 0
+        topBar.ZIndex = 501
+        topBar.Parent = espPreviewPanel
+        Library:AddToRegistry(topBar, { BackgroundColor3 = "AccentColor" })
+        local tbGrad = Instance.new("UIGradient")
+        tbGrad.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.15, 0.1),
+            NumberSequenceKeypoint.new(0.5, 0),
+            NumberSequenceKeypoint.new(0.85, 0.1),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        tbGrad.Parent = topBar
+
+        local titleBar = Instance.new("Frame")
+        titleBar.Size = UDim2.new(1, 0, 0, 28)
+        titleBar.Position = UDim2.new(0, 0, 0, 2)
+        titleBar.BackgroundColor3 = Color3.fromRGB(20, 16, 26)
+        titleBar.BackgroundTransparency = 0.3
+        titleBar.BorderSizePixel = 0
+        titleBar.ZIndex = 501
+        titleBar.Parent = espPreviewPanel
+
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Size = UDim2.new(1, -10, 1, 0)
+        titleLabel.Position = UDim2.new(0, 10, 0, 0)
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.TextSize = 11
+        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        titleLabel.Text = "ESP Preview"
+        titleLabel.ZIndex = 502
+        titleLabel.Parent = titleBar
+        Library:AddToRegistry(titleLabel, { TextColor3 = "FontColor" })
+
+        espViewport = Instance.new("ViewportFrame")
+        espViewport.Size = UDim2.new(1, -12, 1, -38)
+        espViewport.Position = UDim2.new(0, 6, 0, 32)
+        espViewport.BackgroundColor3 = Color3.fromRGB(10, 8, 14)
+        espViewport.BackgroundTransparency = 0
+        espViewport.BorderSizePixel = 0
+        espViewport.ZIndex = 501
+        espViewport.Ambient = Color3.fromRGB(180, 160, 200)
+        espViewport.LightColor = Color3.fromRGB(255, 240, 255)
+        espViewport.LightDirection = Vector3.new(-1, -2, -1)
+        espViewport.Parent = espPreviewPanel
+
+        local vpCorner = Instance.new("UICorner")
+        vpCorner.CornerRadius = UDim.new(0, 6)
+        vpCorner.Parent = espViewport
+
+        espPreviewCamera = Instance.new("Camera")
+        espPreviewCamera.FieldOfView = 50
+        espPreviewCamera.Parent = espViewport
+        espViewport.CurrentCamera = espPreviewCamera
+
+        local lp = game.Players.LocalPlayer
+        local char = lp and lp.Character
+        if char then
+            local clone = char:Clone()
+            for _, v in ipairs(clone:GetDescendants()) do
+                if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
+                    v:Destroy()
+                end
+            end
+            for _, v in ipairs(clone:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.Anchored = true
+                    v.CanCollide = false
+                end
+            end
+            clone.Parent = espViewport
+
+            local rootPart = clone:FindFirstChild("HumanoidRootPart") or clone:FindFirstChildWhichIsA("BasePart")
+            if rootPart then
+                local cf = rootPart.CFrame
+                espPreviewCamera.CFrame = CFrame.new(cf.Position + Vector3.new(3, 1.5, 5), cf.Position + Vector3.new(0, 0.5, 0))
+            end
+
+            local npcModel = Instance.new("Model")
+            npcModel.Name = "NPC_Preview"
+            local npcPart = Instance.new("Part")
+            npcPart.Size = Vector3.new(2, 5, 1)
+            npcPart.Anchored = true
+            npcPart.CanCollide = false
+            npcPart.BrickColor = BrickColor.new("Medium stone grey")
+            if rootPart then
+                npcPart.CFrame = rootPart.CFrame * CFrame.new(4, 0, 0)
+            end
+            npcPart.Parent = npcModel
+            local npcHead = Instance.new("Part")
+            npcHead.Size = Vector3.new(1.2, 1.2, 1.2)
+            npcHead.Anchored = true
+            npcHead.CanCollide = false
+            npcHead.BrickColor = BrickColor.new("Pastel brown")
+            npcHead.CFrame = npcPart.CFrame * CFrame.new(0, 3.1, 0)
+            npcHead.Parent = npcModel
+            npcModel.Parent = espViewport
+        end
+
+        local function positionPanel()
+            pcall(function()
+                local mainWin = Library.ScreenGui:FindFirstChildWhichIsA("Frame", true)
+                if mainWin then
+                    espPreviewPanel.Position = UDim2.new(0, mainWin.AbsolutePosition.X + mainWin.AbsoluteSize.X + 8, 0, mainWin.AbsolutePosition.Y)
+                else
+                    espPreviewPanel.Position = UDim2.new(0.6, 10, 0.1, 0)
+                end
+            end)
+        end
+        positionPanel()
+
+        local dragging, dragStart, startPos = false, nil, nil
+        titleBar.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = inp.Position
+                startPos = espPreviewPanel.Position
+            end
+        end)
+        game:GetService("UserInputService").InputChanged:Connect(function(inp)
+            if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+                local delta = inp.Position - dragStart
+                espPreviewPanel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+        game:GetService("UserInputService").InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+    end
+
+    local function destroyESPPreview()
+        if espPreviewPanel then
+            espPreviewPanel:Destroy()
+            espPreviewPanel = nil
+            espPreviewCamera = nil
+            espViewport = nil
+        end
+    end
+
+    Library.Toggles.ESPPreviewToggle:OnChanged(function(v)
+        if v then
+            createESPPreview()
+            if espPreviewPanel then espPreviewPanel.Visible = true end
+        else
+            destroyESPPreview()
+        end
     end)
 end
 
