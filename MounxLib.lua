@@ -1608,7 +1608,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     local InterfaceGroup = SettingsTab:AddLeftGroupbox('Interface')
 
     InterfaceGroup:AddDropdown('NotifPositionDrop', {
-        Text = 'Notification Side', Values = { 'Right', 'Left' }, Default = 1, Multi = false,
+        Text = 'Notification Side', Values = { 'Right', 'Left' }, Default = 2, Multi = false,
         Tooltip = 'Side of the screen where notifications appear'
     })
     Library.Options.NotifPositionDrop:OnChanged(function()
@@ -1634,6 +1634,8 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         end)
     end)
 
+    InterfaceGroup:AddDivider()
+    
     InterfaceGroup:AddDropdown('MenuFontDrop', {
         Text = 'Menu Font', Default = 1, Multi = false,
         Values = { 'GothamBold', 'Gotham', 'GothamMedium', 'GothamSemibold', 'Arimo', 'Ubuntu', 'Code' },
