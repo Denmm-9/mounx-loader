@@ -1890,6 +1890,9 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     TextGroup:AddColorPicker('TextColor', {
         Text = 'Text Color', Default = Color3.fromRGB(255, 255, 255)
     })
+    TextGroup:AddSlider('ESPTextSize', {
+        Text = 'Text Size', Min = 9, Max = 20, Default = 13, Rounding = 0
+    })
 
     -- =============================================
     -- Right: Health Bar groupbox
@@ -2188,6 +2191,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         local boxFilled = Library.Toggles.BoxFilled and Library.Toggles.BoxFilled.Value
         local fillTrans = Library.Options.BoxFillTransparency and Library.Options.BoxFillTransparency.Value or 0.5
         local textColor = Library.Options.TextColor and Library.Options.TextColor.Value or Color3.fromRGB(255, 255, 255)
+        local textSize = Library.Options.ESPTextSize and Library.Options.ESPTextSize.Value or 13
         local tracerColor = Library.Options.TracerColor and Library.Options.TracerColor.Value or Color3.fromRGB(255, 107, 157)
         local arrowColor = Library.Options.ArrowColor and Library.Options.ArrowColor.Value or Color3.fromRGB(255, 255, 255)
         local maxDistance = Library.Options.ESPMaxDist and Library.Options.ESPMaxDist.Value or 1500
@@ -2421,6 +2425,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
 
                             if Library.Toggles.HealthBarText and Library.Toggles.HealthBarText.Value then
                                 d.healthText.Visible = true
+                                d.healthText.Size = math.max(9, textSize - 2)
                                 d.healthText.Text = math.floor(hp) .. " HP"
                                 d.healthText.Position = Vector2.new(barX - 44, barY + (barH - fillH) - 6)
                             else
@@ -2435,6 +2440,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                         -- 3. TEXTS (Name, Distance, Weapon)
                         if Library.Toggles.NameESP and Library.Toggles.NameESP.Value then
                             d.nameText.Visible = true
+                            d.nameText.Size = textSize
                             d.nameText.Text = t.name
                             d.nameText.Position = Vector2.new(boxX + (boxWidth / 2), boxY - 16)
                             d.nameText.Color = textColor
@@ -2446,10 +2452,11 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                         if Library.Toggles.DistanceESP and Library.Toggles.DistanceESP.Value then
                             local dVal = math.floor(dist)
                             d.distText.Visible = true
+                            d.distText.Size = math.max(9, textSize - 2)
                             d.distText.Text = dVal .. " studs"
                             d.distText.Position = Vector2.new(boxX + (boxWidth / 2), boxY + boxHeight + botOffset)
                             d.distText.Color = textColor
-                            botOffset = botOffset + 13
+                            botOffset = botOffset + math.max(12, textSize)
                         else
                             d.distText.Visible = false
                         end
@@ -2458,6 +2465,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                             local tool = model:FindFirstChildOfClass("Tool")
                             if tool then
                                 d.weaponText.Visible = true
+                                d.weaponText.Size = math.max(9, textSize - 2)
                                 d.weaponText.Text = "[" .. tool.Name .. "]"
                                 d.weaponText.Position = Vector2.new(boxX + (boxWidth / 2), boxY + boxHeight + botOffset)
                             else
@@ -2593,17 +2601,20 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     local rotX = 0
     local isMouseDown = false
     local lastMousePos = Vector2.new()
+    local originalPartProps = {}
 
     -- Live Preview ESP Overlay Elements
     local pvOverlayContainer = nil
     local pvBox = nil
     local pvBoxStroke = nil
     local pvCornerFrames = {}
+    local pvBox3DFrames = {}
     local pvHealthBarBg = nil
     local pvHealthBarFill = nil
     local pvHealthText = nil
     local pvNameText = nil
     local pvDistText = nil
+    local pvHeadDot = nil
 
     -- Helper to find Linoria's main window frame
     local function getMainFrame()
@@ -2618,9 +2629,54 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         return nil
     end
 
+    -- Math helper: Local projection from 3D world coordinates into espViewport pixel coordinates (0..vpW, 0..vpH)
+    local function worldToPreviewPoint(worldPos)
+        if not espPreviewCamera or not espViewport then return Vector2.new(-999, -999), false end
+        local vpW = espViewport.AbsoluteSize.X
+        local vpH = espViewport.AbsoluteSize.Y
+        if vpW <= 0 or vpH <= 0 then return Vector2.new(-999, -999), false end
+
+        local camCF = espPreviewCamera.CFrame
+        local rel = camCF:PointToObjectSpace(worldPos)
+
+        -- If behind or too close to camera plane, discard
+        if rel.Z >= -0.1 then return Vector2.new(-999, -999), false end
+
+        local fovRad = math.rad(espPreviewCamera.FieldOfView)
+        local halfH = math.tan(fovRad / 2)
+        local aspect = vpW / vpH
+        local halfW = halfH * aspect
+
+        local depth = -rel.Z
+        local normX = rel.X / (depth * halfW)
+        local normY = rel.Y / (depth * halfH)
+
+        local px = (normX + 1) * 0.5 * vpW
+        local py = (1 - (normY + 1) * 0.5) * vpH
+
+        return Vector2.new(px, py), true
+    end
+
+    -- Helper to render a 2D Gui line frame between two Vector2 coordinates
+    local function drawGuiLine(frame, p1, p2, color, thickness)
+        local diff = p2 - p1
+        local dist = diff.Magnitude
+        if dist < 0.5 then
+            frame.Visible = false
+            return
+        end
+        local angle = math.deg(math.atan2(diff.Y, diff.X))
+        frame.Visible = true
+        frame.Size = UDim2.new(0, math.floor(dist), 0, thickness or 1.5)
+        frame.Position = UDim2.new(0, math.floor(p1.X + diff.X * 0.5 - dist * 0.5), 0, math.floor(p1.Y + diff.Y * 0.5 - (thickness or 1.5) * 0.5))
+        frame.Rotation = angle
+        frame.BackgroundColor3 = color
+    end
+
     local function populatePreviewCharacter()
         if not worldModel then return end
         worldModel:ClearAllChildren()
+        table.clear(originalPartProps)
 
         local char = LocalPlayer and LocalPlayer.Character
         if char then
@@ -2636,15 +2692,22 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                     elseif v:IsA("BasePart") then
                         v.Anchored = true
                         v.CanCollide = false
+                        originalPartProps[v] = {
+                            Color = v.Color,
+                            Material = v.Material,
+                            Transparency = v.Transparency
+                        }
                     end
                 end
 
+                -- Rotate character 180 degrees around Y axis so it looks directly FORWARD (facing the viewer!)
+                local rot180 = CFrame.Angles(0, math.pi, 0)
                 local root = clone:FindFirstChild("HumanoidRootPart") or clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart")
                 if root then
                     local offset = root.CFrame
                     for _, part in ipairs(clone:GetDescendants()) do
                         if part:IsA("BasePart") then
-                            part.CFrame = offset:ToObjectSpace(part.CFrame)
+                            part.CFrame = rot180 * offset:ToObjectSpace(part.CFrame)
                         end
                     end
                 end
@@ -2659,8 +2722,8 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         if not gui then return end
 
         local mainWin = getMainFrame()
-        local winHeight = mainWin and mainWin.AbsoluteSize.Y or 450
-        local previewW = 300 -- Wider, spacious preview as requested!
+        local winHeight = mainWin and mainWin.AbsoluteSize.Y or 460
+        local previewW = 390 -- Wide, spacious preview window!
 
         -- Outer Panel (anchored to main window, themed accent border)
         espPreviewPanel = Instance.new("Frame")
@@ -2756,8 +2819,8 @@ function MounxHub:BuildVisuals(VisualsTab, options)
 
         -- Viewport Frame
         espViewport = Instance.new("ViewportFrame")
-        espViewport.Size = UDim2.new(1, -12, 1, -56)
-        espViewport.Position = UDim2.new(0, 6, 0, 34)
+        espViewport.Size = UDim2.new(1, -16, 1, -56)
+        espViewport.Position = UDim2.new(0, 8, 0, 34)
         espViewport.BackgroundColor3 = Color3.fromRGB(10, 8, 14)
         espViewport.BackgroundTransparency = 0
         espViewport.BorderSizePixel = 0
@@ -2822,6 +2885,18 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             table.insert(pvCornerFrames, cf)
         end
 
+        -- Preview 3D Box lines (12 Frame segments)
+        pvBox3DFrames = {}
+        for i = 1, 12 do
+            local lf = Instance.new("Frame")
+            lf.BorderSizePixel = 0
+            lf.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+            lf.ZIndex = 507
+            lf.Visible = false
+            lf.Parent = pvOverlayContainer
+            table.insert(pvBox3DFrames, lf)
+        end
+
         -- Preview Health Bar Background
         pvHealthBarBg = Instance.new("Frame")
         pvHealthBarBg.Name = "PreviewHB_Bg"
@@ -2876,10 +2951,23 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         pvDistText.TextColor3 = Color3.fromRGB(255, 255, 255)
         pvDistText.TextStrokeTransparency = 0
         pvDistText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        pvDistText.Text = "0 studs"
+        pvDistText.Text = "15 studs"
         pvDistText.ZIndex = 508
         pvDistText.Visible = false
         pvDistText.Parent = pvOverlayContainer
+
+        -- Preview Head Dot
+        pvHeadDot = Instance.new("Frame")
+        pvHeadDot.Name = "PreviewHeadDot"
+        pvHeadDot.BorderSizePixel = 0
+        pvHeadDot.Size = UDim2.new(0, 6, 0, 6)
+        pvHeadDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        pvHeadDot.ZIndex = 508
+        pvHeadDot.Visible = false
+        local hdCorner = Instance.new("UICorner")
+        hdCorner.CornerRadius = UDim.new(1, 0)
+        hdCorner.Parent = pvHeadDot
+        pvHeadDot.Parent = pvOverlayContainer
 
         -- Auto-refresh character if local character respawns
         if LocalPlayer then
@@ -2903,7 +2991,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 local currentPos = Vector2.new(input.Position.X, input.Position.Y)
                 local delta = currentPos - lastMousePos
                 rotY = rotY + delta.X * 0.015
-                rotX = math.clamp(rotX + delta.Y * 0.015, -0.4, 0.4)
+                rotX = math.clamp(rotX + delta.Y * 0.015, -0.6, 0.6)
                 lastMousePos = currentPos
             end
         end)
@@ -2922,6 +3010,17 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             espViewport = nil
             worldModel = nil
             pvOverlayContainer = nil
+            pvBox = nil
+            pvBoxStroke = nil
+            pvCornerFrames = {}
+            pvBox3DFrames = {}
+            pvHealthBarBg = nil
+            pvHealthBarFill = nil
+            pvHealthText = nil
+            pvNameText = nil
+            pvDistText = nil
+            pvHeadDot = nil
+            table.clear(originalPartProps)
         end
     end
 
@@ -2949,30 +3048,61 @@ function MounxHub:BuildVisuals(VisualsTab, options)
 
         espPreviewPanel.Visible = true
 
-        -- Match main window height & anchor right next to it with 8px gap
+        -- Match main window height & anchor right next to it with 10px gap
         local mainPos = mainWin.AbsolutePosition
         local mainSize = mainWin.AbsoluteSize
-        local previewW = math.clamp(math.floor(mainSize.X * 0.52), 280, 330)
-        local gap = 8
+        local previewW = math.clamp(math.floor(mainSize.X * 0.70), 380, 460)
+        local gap = 10
 
         local targetX = mainPos.X + mainSize.X + gap
         -- Responsive check for narrow screens / mobile: flip to left side if no space on right
         if targetX + previewW > Camera.ViewportSize.X - 10 then
-            targetX = math.max(10, mainPos.X - previewW - gap)
+            if mainPos.X - previewW - gap >= 10 then
+                targetX = mainPos.X - previewW - gap
+            else
+                previewW = math.min(previewW, Camera.ViewportSize.X - 20)
+                targetX = math.clamp(mainPos.X + mainSize.X + gap, 10, Camera.ViewportSize.X - previewW - 10)
+            end
         end
 
         espPreviewPanel.Position = UDim2.new(0, targetX, 0, mainPos.Y)
         espPreviewPanel.Size = UDim2.new(0, previewW, 0, mainSize.Y)
 
         -- 3D Camera Orbit & Rotation (Manual only, default looking straight from front!)
+        -- camDist = 11.2 provides full head-to-toe framing with wide side margins
         if espPreviewCamera then
-            local camDist = 8.6
+            local camDist = 11.2
             local camY = math.sin(rotX) * camDist
             local camPlane = math.cos(rotX) * camDist
             local camX = math.sin(rotY) * camPlane
             local camZ = math.cos(rotY) * camPlane
-            -- Target is center of the character (0, 0, 0), perfectly framed!
-            espPreviewCamera.CFrame = CFrame.new(Vector3.new(camX, camY + 0.3, camZ), Vector3.new(0, 0, 0))
+            -- Target is center of the character, perfectly framed!
+            espPreviewCamera.CFrame = CFrame.new(Vector3.new(camX, camY + 0.1, camZ), Vector3.new(0, -0.1, 0))
+        end
+
+        -- ============================================================
+        -- LIVE CHAMS HANDLING IN PREVIEW (Color cleanly restored when off!)
+        -- ============================================================
+        if worldModel then
+            local isChams = Library.Toggles.ChamsESP and Library.Toggles.ChamsESP.Value
+            local chamCol = Library.Options.ChamsColorVisible and Library.Options.ChamsColorVisible.Value or Color3.fromRGB(255, 107, 157)
+            for _, part in ipairs(worldModel:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    local orig = originalPartProps[part]
+                    if isChams then
+                        part.Color = chamCol
+                        part.Material = Enum.Material.Neon
+                    else
+                        if orig then
+                            part.Color = orig.Color
+                            part.Material = orig.Material
+                            part.Transparency = orig.Transparency
+                        else
+                            part.Material = Enum.Material.SmoothPlastic
+                        end
+                    end
+                end
+            end
         end
 
         -- ============================================================
@@ -2982,24 +3112,41 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         if not espEnabled or not pvOverlayContainer then
             if pvBox then pvBox.Visible = false end
             for _, f in ipairs(pvCornerFrames) do f.Visible = false end
+            for _, f in ipairs(pvBox3DFrames) do f.Visible = false end
             if pvHealthBarBg then pvHealthBarBg.Visible = false end
             if pvHealthText then pvHealthText.Visible = false end
             if pvNameText then pvNameText.Visible = false end
             if pvDistText then pvDistText.Visible = false end
+            if pvHeadDot then pvHeadDot.Visible = false end
             return
         end
 
-        -- Project top and bottom points of the 3D model inside ViewportFrame
+        -- Project top and bottom points of the 3D model inside ViewportFrame using local math projection
         if espPreviewCamera then
-            local topWorld = Vector3.new(0, 2.65, 0)
-            local botWorld = Vector3.new(0, -3.1, 0)
-            local topScr, tVis = espPreviewCamera:WorldToViewportPoint(topWorld)
-            local botScr, bVis = espPreviewCamera:WorldToViewportPoint(botWorld)
+            local cloneModel = worldModel:FindFirstChildWhichIsA("Model")
+            local minY, maxY = -3.0, 2.7
+            if cloneModel then
+                local pMinY, pMaxY = math.huge, -math.huge
+                for _, p in ipairs(cloneModel:GetDescendants()) do
+                    if p:IsA("BasePart") then
+                        pMinY = math.min(pMinY, p.Position.Y - p.Size.Y * 0.5)
+                        pMaxY = math.max(pMaxY, p.Position.Y + p.Size.Y * 0.5)
+                    end
+                end
+                if pMinY < math.huge and pMaxY > -math.huge then
+                    minY = pMinY
+                    maxY = pMaxY
+                end
+            end
+
+            local topWorld = Vector3.new(0, maxY + 0.1, 0)
+            local botWorld = Vector3.new(0, minY - 0.1, 0)
+            local topScr, tVis = worldToPreviewPoint(topWorld)
+            local botScr, bVis = worldToPreviewPoint(botWorld)
 
             local boxH = math.abs(botScr.Y - topScr.Y)
-            local boxW = math.floor(boxH * 0.58)
-            local vpW = espViewport.AbsoluteSize.X
-            local boxX = math.floor((vpW / 2) - (boxW / 2))
+            local boxW = math.floor(boxH * 0.56)
+            local boxX = math.floor(topScr.X - (boxW / 2))
             local boxY = math.floor(topScr.Y)
 
             local boxColor = Library.Options.BoxColorPlayers and Library.Options.BoxColorPlayers.Value or Color3.fromRGB(255, 100, 100)
@@ -3007,13 +3154,16 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             local boxFilled = Library.Toggles.BoxFilled and Library.Toggles.BoxFilled.Value
             local fillTrans = Library.Options.BoxFillTransparency and Library.Options.BoxFillTransparency.Value or 0.5
             local textColor = Library.Options.TextColor and Library.Options.TextColor.Value or Color3.fromRGB(255, 255, 255)
+            local textSize = Library.Options.ESPTextSize and Library.Options.ESPTextSize.Value or 13
 
-            -- 1. Preview Box & Corners
+            -- 1. Preview Box & Corners & 3D Box
             if boxStyle == "2D Box" or boxStyle == "Full Box" then
                 for _, f in ipairs(pvCornerFrames) do f.Visible = false end
+                for _, f in ipairs(pvBox3DFrames) do f.Visible = false end
                 pvBox.Visible = true
                 pvBox.Position = UDim2.new(0, boxX, 0, boxY)
                 pvBox.Size = UDim2.new(0, boxW, 0, boxH)
+                pvBoxStroke.Transparency = 0
                 pvBoxStroke.Color = boxColor
                 pvBoxStroke.Thickness = 1.5
 
@@ -3025,7 +3175,9 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 end
 
             elseif boxStyle == "Corner Box" then
-                -- Corner Box Live Preview!
+                for _, f in ipairs(pvBox3DFrames) do f.Visible = false end
+
+                -- Corner Box Live Preview with BoxFilled support!
                 if boxFilled then
                     pvBox.Visible = true
                     pvBox.Position = UDim2.new(0, boxX, 0, boxY)
@@ -3037,7 +3189,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                     pvBox.Visible = false
                 end
 
-                local cl = math.clamp(math.floor(boxW * 0.28), 5, 20)
+                local cl = math.clamp(math.floor(boxW * 0.28), 6, 22)
                 local th = 2
                 local segs = {
                     { UDim2.new(0, boxX, 0, boxY), UDim2.new(0, cl, 0, th) },
@@ -3059,15 +3211,46 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                     end
                 end
 
+            elseif boxStyle == "3D Box" then
+                pvBox.Visible = false
+                for _, f in ipairs(pvCornerFrames) do f.Visible = false end
+
+                -- 3D Box live perspective rendering in Preview!
+                local sx, sy, sz = 1.7, 2.7, 1.2
+                local pts3D = {
+                    Vector3.new(-sx,  sy, -sz),
+                    Vector3.new( sx,  sy, -sz),
+                    Vector3.new( sx, -sy, -sz),
+                    Vector3.new(-sx, -sy, -sz),
+                    Vector3.new(-sx,  sy,  sz),
+                    Vector3.new( sx,  sy,  sz),
+                    Vector3.new( sx, -sy,  sz),
+                    Vector3.new(-sx, -sy,  sz),
+                }
+                local sPts = {}
+                for i = 1, 8 do
+                    sPts[i] = worldToPreviewPoint(pts3D[i])
+                end
+                local edges = {
+                    {1,2}, {2,3}, {3,4}, {4,1},
+                    {5,6}, {6,7}, {7,8}, {8,5},
+                    {1,5}, {2,6}, {3,7}, {4,8}
+                }
+                for i = 1, 12 do
+                    local e = edges[i]
+                    drawGuiLine(pvBox3DFrames[i], sPts[e[1]], sPts[e[2]], boxColor, 1.5)
+                end
+
             else
                 pvBox.Visible = false
                 for _, f in ipairs(pvCornerFrames) do f.Visible = false end
+                for _, f in ipairs(pvBox3DFrames) do f.Visible = false end
             end
 
             -- 2. Preview Health Bar & HP Text ("100 HP")
             if Library.Toggles.HealthBarESP and Library.Toggles.HealthBarESP.Value then
-                local barW = 3
-                local barX = boxX - barW - 5
+                local barW = 4
+                local barX = boxX - barW - 7
                 pvHealthBarBg.Visible = true
                 pvHealthBarBg.Position = UDim2.new(0, barX, 0, boxY)
                 pvHealthBarBg.Size = UDim2.new(0, barW, 0, boxH)
@@ -3077,8 +3260,10 @@ function MounxHub:BuildVisuals(VisualsTab, options)
 
                 if Library.Toggles.HealthBarText and Library.Toggles.HealthBarText.Value then
                     pvHealthText.Visible = true
-                    pvHealthText.Position = UDim2.new(0, barX - 44, 0, boxY - 4)
+                    pvHealthText.Position = UDim2.new(0, barX - 52, 0, boxY - 3)
+                    pvHealthText.Size = UDim2.new(0, 48, 0, 14)
                     pvHealthText.Text = "100 HP"
+                    pvHealthText.TextSize = math.max(9, textSize - 2)
                 else
                     pvHealthText.Visible = false
                 end
@@ -3090,9 +3275,10 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             -- 3. Preview Name Text
             if Library.Toggles.NameESP and Library.Toggles.NameESP.Value then
                 pvNameText.Visible = true
-                pvNameText.Position = UDim2.new(0, boxX - 40, 0, boxY - 17)
+                pvNameText.Position = UDim2.new(0, boxX - 40, 0, boxY - 18)
                 pvNameText.Size = UDim2.new(0, boxW + 80, 0, 14)
                 pvNameText.TextColor3 = textColor
+                pvNameText.TextSize = textSize
             else
                 pvNameText.Visible = false
             end
@@ -3100,27 +3286,27 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             -- 4. Preview Distance Text
             if Library.Toggles.DistanceESP and Library.Toggles.DistanceESP.Value then
                 pvDistText.Visible = true
-                pvDistText.Position = UDim2.new(0, boxX - 40, 0, boxY + boxH + 2)
+                pvDistText.Position = UDim2.new(0, boxX - 40, 0, boxY + boxH + 3)
                 pvDistText.Size = UDim2.new(0, boxW + 80, 0, 14)
                 pvDistText.TextColor3 = textColor
+                pvDistText.TextSize = math.max(9, textSize - 2)
             else
                 pvDistText.Visible = false
             end
 
-            -- 5. Preview Chams (Tint character parts inside ViewportFrame!)
-            if worldModel then
-                local isChams = Library.Toggles.ChamsESP and Library.Toggles.ChamsESP.Value
-                local chamCol = Library.Options.ChamsColorVisible and Library.Options.ChamsColorVisible.Value or Color3.fromRGB(255, 107, 157)
-                for _, part in ipairs(worldModel:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        if isChams then
-                            part.Color = chamCol
-                            part.Material = Enum.Material.Neon
-                        else
-                            part.Material = Enum.Material.SmoothPlastic
-                        end
-                    end
+            -- 5. Preview Head Dot
+            if Library.Toggles.HeadDotESP and Library.Toggles.HeadDotESP.Value then
+                local headPos = Vector3.new(0, 2.0, 0)
+                local hpPoint, hpVis = worldToPreviewPoint(headPos)
+                if hpVis then
+                    pvHeadDot.Visible = true
+                    pvHeadDot.Position = UDim2.new(0, math.floor(hpPoint.X - 3), 0, math.floor(hpPoint.Y - 3))
+                    pvHeadDot.BackgroundColor3 = boxColor
+                else
+                    pvHeadDot.Visible = false
                 end
+            else
+                pvHeadDot.Visible = false
             end
         end
     end)
