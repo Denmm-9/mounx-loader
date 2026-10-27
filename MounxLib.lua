@@ -1595,6 +1595,14 @@ end
 
 function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
     -- =====================
+    -- Menu groupbox (always first on left)
+    -- =====================
+    local MenuGroup = SettingsTab:AddLeftGroupbox('Menu')
+    MenuGroup:AddButton('Unload Script', function() Library:Unload() end)
+    MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'X', NoUI = true, Text = 'Menu keybind' })
+    Library.ToggleKeybind = Library.Options.MenuKeybind
+
+    -- =====================
     -- Interface groupbox (notification side, font, auto re-exec)
     -- =====================
     local InterfaceGroup = SettingsTab:AddLeftGroupbox('Interface')
@@ -1665,11 +1673,7 @@ function MounxHub:BuildSettings(SettingsTab, ConfigFolderName)
         end
     end)
 
-    local MenuGroup = SettingsTab:AddLeftGroupbox('Menu & Close')
-    MenuGroup:AddButton('Unload Script', function() Library:Unload() end)
-    MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'X', NoUI = true, Text = 'Menu keybind' })
-    Library.ToggleKeybind = Library.Options.MenuKeybind
-    
+
     local ExtrasGroup = SettingsTab:AddRightGroupbox('Menu Extras')
     local wmToggle = ExtrasGroup:AddToggle('WatermarkToggle', {
         Text = 'Show Watermark', Default = false,
@@ -1990,19 +1994,27 @@ function MounxHub:BuildVisuals(VisualsTab, options)
 
         local lp = game.Players.LocalPlayer
         local char = lp and lp.Character
-        if char then
+        pcall(function()
+            if not char then return end
             local clone = char:Clone()
-            for _, v in ipairs(clone:GetDescendants()) do
-                if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
-                    v:Destroy()
+            if not clone then return end
+            -- Remove scripts/particles so the clone is static
+            pcall(function()
+                for _, v in ipairs(clone:GetDescendants()) do
+                    if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
+                        pcall(function() v:Destroy() end)
+                    end
                 end
-            end
-            for _, v in ipairs(clone:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.Anchored = true
-                    v.CanCollide = false
+            end)
+            -- Freeze all parts
+            pcall(function()
+                for _, v in ipairs(clone:GetDescendants()) do
+                    if v:IsA("BasePart") then
+                        v.Anchored = true
+                        v.CanCollide = false
+                    end
                 end
-            end
+            end)
             clone.Parent = espViewport
 
             local rootPart = clone:FindFirstChild("HumanoidRootPart") or clone:FindFirstChildWhichIsA("BasePart")
@@ -2011,6 +2023,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 espPreviewCamera.CFrame = CFrame.new(cf.Position + Vector3.new(3, 1.5, 5), cf.Position + Vector3.new(0, 0.5, 0))
             end
 
+            -- Fake NPC stand-in
             local npcModel = Instance.new("Model")
             npcModel.Name = "NPC_Preview"
             local npcPart = Instance.new("Part")
@@ -2030,7 +2043,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             npcHead.CFrame = npcPart.CFrame * CFrame.new(0, 3.1, 0)
             npcHead.Parent = npcModel
             npcModel.Parent = espViewport
-        end
+        end) -- end pcall(function()
 
         local function positionPanel()
             pcall(function()
