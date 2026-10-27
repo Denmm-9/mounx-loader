@@ -1884,7 +1884,6 @@ function MounxHub:BuildVisuals(VisualsTab, options)
 
     TextGroup:AddToggle('NameESP',       { Text = 'Name',        Default = false })
     TextGroup:AddToggle('DistanceESP',   { Text = 'Distance',    Default = false })
-    TextGroup:AddToggle('HealthTextESP', { Text = 'Health Text', Default = false })
     TextGroup:AddToggle('WeaponESP',     { Text = 'Equipped Tool/Weapon', Default = false })
     TextGroup:AddToggle('HeadDotESP',    { Text = 'Head Dot',    Default = false })
     TextGroup:AddColorPicker('TextColor', {
@@ -1900,7 +1899,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     local HealthBarGroup = VisualsTab:AddRightGroupbox('Health Bar')
 
     HealthBarGroup:AddToggle('HealthBarESP',  { Text = 'Health Bar',    Default = false })
-    HealthBarGroup:AddToggle('HealthBarText', { Text = 'Show HP Value (100 HP)', Default = false })
+    HealthBarGroup:AddToggle('HealthBarText', { Text = 'Show Health Value', Default = false })
     HealthBarGroup:AddColorPicker('HealthBarColor', {
         Text = 'Bar Color', Default = Color3.fromRGB(0, 255, 100)
     })
@@ -2426,8 +2425,10 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                             if Library.Toggles.HealthBarText and Library.Toggles.HealthBarText.Value then
                                 d.healthText.Visible = true
                                 d.healthText.Size = math.max(9, textSize - 2)
-                                d.healthText.Text = math.floor(hp) .. " HP"
-                                d.healthText.Position = Vector2.new(barX - 44, barY + (barH - fillH) - 6)
+                                local hpStr = math.floor(hp) .. " HP"
+                                d.healthText.Text = hpStr
+                                local textWidth = (d.healthText.TextBounds and d.healthText.TextBounds.X > 0) and d.healthText.TextBounds.X or math.floor(d.healthText.Size * 2.3)
+                                d.healthText.Position = Vector2.new(barX - textWidth - 3, barY + (barH - fillH) - 4)
                             else
                                 d.healthText.Visible = false
                             end
@@ -2897,14 +2898,26 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             table.insert(pvBox3DFrames, lf)
         end
 
-        -- Preview Health Bar Background
+        -- Preview Health Bar Background (Rounded & Professional!)
         pvHealthBarBg = Instance.new("Frame")
         pvHealthBarBg.Name = "PreviewHB_Bg"
         pvHealthBarBg.BorderSizePixel = 0
-        pvHealthBarBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        pvHealthBarBg.BackgroundColor3 = Color3.fromRGB(16, 14, 20)
         pvHealthBarBg.ZIndex = 506
         pvHealthBarBg.Visible = false
+        pvHealthBarBg.ClipsDescendants = true
         pvHealthBarBg.Parent = pvOverlayContainer
+
+        local hbBgCorner = Instance.new("UICorner")
+        hbBgCorner.CornerRadius = UDim.new(0, 3)
+        hbBgCorner.Parent = pvHealthBarBg
+
+        local hbBgStroke = Instance.new("UIStroke")
+        hbBgStroke.Thickness = 1
+        hbBgStroke.Color = Color3.fromRGB(0, 0, 0)
+        hbBgStroke.Transparency = 0.2
+        hbBgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        hbBgStroke.Parent = pvHealthBarBg
 
         pvHealthBarFill = Instance.new("Frame")
         pvHealthBarFill.Name = "Fill"
@@ -2914,12 +2927,17 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         pvHealthBarFill.ZIndex = 507
         pvHealthBarFill.Parent = pvHealthBarBg
 
-        -- Preview Health Text ("100 HP")
+        local fillCorner = Instance.new("UICorner")
+        fillCorner.CornerRadius = UDim.new(0, 3)
+        fillCorner.Parent = pvHealthBarFill
+
+        -- Preview Health Text
         pvHealthText = Instance.new("TextLabel")
         pvHealthText.Name = "PreviewHPText"
         pvHealthText.BackgroundTransparency = 1
         pvHealthText.Font = Enum.Font.GothamBold
         pvHealthText.TextSize = 10
+        pvHealthText.TextXAlignment = Enum.TextXAlignment.Right
         pvHealthText.TextColor3 = Color3.fromRGB(255, 255, 255)
         pvHealthText.TextStrokeTransparency = 0
         pvHealthText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -3081,7 +3099,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         end
 
         -- ============================================================
-        -- LIVE CHAMS HANDLING IN PREVIEW (Color cleanly restored when off!)
+        -- LIVE CHAMS HANDLING IN PREVIEW (Translucent holographic glow like real Highlight!)
         -- ============================================================
         if worldModel then
             local isChams = Library.Toggles.ChamsESP and Library.Toggles.ChamsESP.Value
@@ -3092,6 +3110,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                     if isChams then
                         part.Color = chamCol
                         part.Material = Enum.Material.Neon
+                        part.Transparency = 0.42 -- Translucent holographic glow, showing clothes and shape!
                     else
                         if orig then
                             part.Color = orig.Color
@@ -3099,6 +3118,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                             part.Transparency = orig.Transparency
                         else
                             part.Material = Enum.Material.SmoothPlastic
+                            part.Transparency = 0
                         end
                     end
                 end
@@ -3121,35 +3141,57 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             return
         end
 
-        -- Project top and bottom points of the 3D model inside ViewportFrame using local math projection
+        -- Project top, bottom, and side points of the 3D model inside ViewportFrame using local math projection
         if espPreviewCamera then
             local cloneModel = worldModel:FindFirstChildWhichIsA("Model")
             local minY, maxY = -3.0, 2.7
+            local minX, maxX = -1.6, 1.6
             if cloneModel then
                 local pMinY, pMaxY = math.huge, -math.huge
+                local pMinX, pMaxX = math.huge, -math.huge
                 for _, p in ipairs(cloneModel:GetDescendants()) do
                     if p:IsA("BasePart") then
                         pMinY = math.min(pMinY, p.Position.Y - p.Size.Y * 0.5)
                         pMaxY = math.max(pMaxY, p.Position.Y + p.Size.Y * 0.5)
+                        pMinX = math.min(pMinX, p.Position.X - p.Size.X * 0.5)
+                        pMaxX = math.max(pMaxX, p.Position.X + p.Size.X * 0.5)
                     end
                 end
                 if pMinY < math.huge and pMaxY > -math.huge then
                     minY = pMinY
                     maxY = pMaxY
                 end
+                if pMinX < math.huge and pMaxX > -math.huge then
+                    minX = pMinX
+                    maxX = pMaxX
+                end
             end
 
-            local topWorld = Vector3.new(0, maxY + 0.1, 0)
+            local topWorld = Vector3.new(0, maxY + 0.15, 0)
             local botWorld = Vector3.new(0, minY - 0.1, 0)
+            local leftWorld = Vector3.new(minX - 0.1, 0, 0)
+            local rightWorld = Vector3.new(maxX + 0.1, 0, 0)
+
             local topScr, tVis = worldToPreviewPoint(topWorld)
             local botScr, bVis = worldToPreviewPoint(botWorld)
+            local leftScr, lVis = worldToPreviewPoint(leftWorld)
+            local rightScr, rVis = worldToPreviewPoint(rightWorld)
 
             local boxH = math.abs(botScr.Y - topScr.Y)
-            local boxW = math.floor(boxH * 0.56)
-            local boxX = math.floor(topScr.X - (boxW / 2))
+            local boxW = math.abs(rightScr.X - leftScr.X)
+            local boxX = math.floor(math.min(leftScr.X, rightScr.X))
             local boxY = math.floor(topScr.Y)
 
-            local boxColor = Library.Options.BoxColorPlayers and Library.Options.BoxColorPlayers.Value or Color3.fromRGB(255, 100, 100)
+            local targetMode = Library.Options.ESPTarget and Library.Options.ESPTarget.Value or "Players"
+            local isNPCTarget = (targetMode == "NPCs")
+
+            local boxColor
+            if isNPCTarget then
+                boxColor = Library.Options.BoxColorNPCs and Library.Options.BoxColorNPCs.Value or Color3.fromRGB(100, 200, 100)
+            else
+                boxColor = Library.Options.BoxColorPlayers and Library.Options.BoxColorPlayers.Value or Color3.fromRGB(255, 100, 100)
+            end
+
             local boxStyle = Library.Options.BoxStyle and Library.Options.BoxStyle.Value or "2D Box"
             local boxFilled = Library.Toggles.BoxFilled and Library.Toggles.BoxFilled.Value
             local fillTrans = Library.Options.BoxFillTransparency and Library.Options.BoxFillTransparency.Value or 0.5
@@ -3216,7 +3258,9 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 for _, f in ipairs(pvCornerFrames) do f.Visible = false end
 
                 -- 3D Box live perspective rendering in Preview!
-                local sx, sy, sz = 1.7, 2.7, 1.2
+                local sx = math.max(1.3, (maxX - minX) * 0.5 + 0.1)
+                local sy = math.max(2.2, (maxY - minY) * 0.5 + 0.1)
+                local sz = 1.1
                 local pts3D = {
                     Vector3.new(-sx,  sy, -sz),
                     Vector3.new( sx,  sy, -sz),
@@ -3247,22 +3291,36 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 for _, f in ipairs(pvBox3DFrames) do f.Visible = false end
             end
 
-            -- 2. Preview Health Bar & HP Text ("100 HP")
+            -- 2. Preview Health Bar (Rounded & Professional) & Animated HP Text
             if Library.Toggles.HealthBarESP and Library.Toggles.HealthBarESP.Value then
                 local barW = 4
-                local barX = boxX - barW - 7
+                local barX = boxX - barW - 6
                 pvHealthBarBg.Visible = true
                 pvHealthBarBg.Position = UDim2.new(0, barX, 0, boxY)
                 pvHealthBarBg.Size = UDim2.new(0, barW, 0, boxH)
 
-                local hbColor = Library.Options.HealthBarColor and Library.Options.HealthBarColor.Value or Color3.fromRGB(0, 255, 100)
-                pvHealthBarFill.BackgroundColor3 = hbColor
+                -- Dynamic animated health cycle for preview:
+                -- Drops from 100% -> 22% -> heals back to 100%
+                local pTime = os.clock() * 1.5
+                local rawCycle = (math.sin(pTime) + 1) * 0.5
+                local previewHPPercent = math.clamp(0.20 + 0.80 * rawCycle, 0.20, 1.0)
+                local previewHP = math.floor(previewHPPercent * 100)
+
+                local fillH = math.floor(boxH * previewHPPercent)
+                pvHealthBarFill.Size = UDim2.new(1, 0, previewHPPercent, 0)
+                pvHealthBarFill.Position = UDim2.new(0, 0, 1 - previewHPPercent, 0)
+
+                local customHpColor = Library.Options.HealthBarColor and Library.Options.HealthBarColor.Value
+                local dynamicHpColor = Color3.fromRGB(255, 45, 45):Lerp(Color3.fromRGB(45, 255, 110), previewHPPercent)
+                pvHealthBarFill.BackgroundColor3 = customHpColor or dynamicHpColor
 
                 if Library.Toggles.HealthBarText and Library.Toggles.HealthBarText.Value then
                     pvHealthText.Visible = true
-                    pvHealthText.Position = UDim2.new(0, barX - 52, 0, boxY - 3)
+                    pvHealthText.Text = previewHP .. " HP"
+                    local fillY = boxY + (boxH - fillH)
                     pvHealthText.Size = UDim2.new(0, 48, 0, 14)
-                    pvHealthText.Text = "100 HP"
+                    pvHealthText.Position = UDim2.new(0, barX - 52, 0, fillY - 7)
+                    pvHealthText.TextXAlignment = Enum.TextXAlignment.Right
                     pvHealthText.TextSize = math.max(9, textSize - 2)
                 else
                     pvHealthText.Visible = false
@@ -3272,13 +3330,18 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 pvHealthText.Visible = false
             end
 
-            -- 3. Preview Name Text
+            -- 3. Preview Name Text (Player vs NPC Target)
             if Library.Toggles.NameESP and Library.Toggles.NameESP.Value then
                 pvNameText.Visible = true
                 pvNameText.Position = UDim2.new(0, boxX - 40, 0, boxY - 18)
                 pvNameText.Size = UDim2.new(0, boxW + 80, 0, 14)
                 pvNameText.TextColor3 = textColor
                 pvNameText.TextSize = textSize
+                if isNPCTarget then
+                    pvNameText.Text = "[NPC] Target"
+                else
+                    pvNameText.Text = LocalPlayer and (LocalPlayer.DisplayName or LocalPlayer.Name) or "LocalPlayer"
+                end
             else
                 pvNameText.Visible = false
             end
@@ -3290,6 +3353,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 pvDistText.Size = UDim2.new(0, boxW + 80, 0, 14)
                 pvDistText.TextColor3 = textColor
                 pvDistText.TextSize = math.max(9, textSize - 2)
+                pvDistText.Text = isNPCTarget and "28 studs" or "15 studs"
             else
                 pvDistText.Visible = false
             end
