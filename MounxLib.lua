@@ -1898,10 +1898,11 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     -- =============================================
     local HealthBarGroup = VisualsTab:AddRightGroupbox('Health Bar')
 
-    HealthBarGroup:AddToggle('HealthBarESP',  { Text = 'Health Bar',    Default = false })
-    HealthBarGroup:AddToggle('HealthBarText', { Text = 'Show Health Value', Default = false })
+    HealthBarGroup:AddToggle('HealthBarESP',        { Text = 'Health Bar',         Default = false })
+    HealthBarGroup:AddToggle('HealthBarColorBased', { Text = 'Color Based',        Default = true, Tooltip = 'Dynamically transitions green -> yellow -> red based on HP' })
+    HealthBarGroup:AddToggle('HealthBarText',       { Text = 'Show Health Value',  Default = false })
     HealthBarGroup:AddColorPicker('HealthBarColor', {
-        Text = 'Bar Color', Default = Color3.fromRGB(0, 255, 100)
+        Text = 'Custom Bar Color', Default = Color3.fromRGB(0, 255, 100)
     })
 
     -- =============================================
@@ -2418,9 +2419,20 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                             d.healthBar.Position = Vector2.new(barX, barY + (barH - fillH))
                             d.healthBar.Size = Vector2.new(barWidth, fillH)
 
-                            local customHpColor = Library.Options.HealthBarColor and Library.Options.HealthBarColor.Value
-                            local hpGrad = Color3.fromRGB(255, 40, 40):Lerp(Color3.fromRGB(40, 255, 100), hpPercent)
-                            d.healthBar.Color = customHpColor or hpGrad
+                            local isColorBased = (Library.Toggles.HealthBarColorBased == nil) or (Library.Toggles.HealthBarColorBased and Library.Toggles.HealthBarColorBased.Value)
+                            local hpGrad
+                            if hpPercent > 0.5 then
+                                hpGrad = Color3.fromRGB(255, 215, 0):Lerp(Color3.fromRGB(45, 255, 110), (hpPercent - 0.5) * 2)
+                            else
+                                hpGrad = Color3.fromRGB(255, 40, 40):Lerp(Color3.fromRGB(255, 215, 0), hpPercent * 2)
+                            end
+
+                            if isColorBased then
+                                d.healthBar.Color = hpGrad
+                            else
+                                local customHpColor = Library.Options.HealthBarColor and Library.Options.HealthBarColor.Value
+                                d.healthBar.Color = customHpColor or hpGrad
+                            end
 
                             if Library.Toggles.HealthBarText and Library.Toggles.HealthBarText.Value then
                                 d.healthText.Visible = true
@@ -2615,6 +2627,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
     local pvHealthText = nil
     local pvNameText = nil
     local pvDistText = nil
+    local pvWeaponText = nil
     local pvHeadDot = nil
 
     -- Helper to find Linoria's main window frame
@@ -2628,6 +2641,27 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             end
         end
         return nil
+    end
+
+    -- Helper to detect if the user is currently on the Visuals tab
+    local function isVisualsTabActive()
+        if not VisualsTab then return false end
+        if VisualsTab.Active ~= nil then return VisualsTab.Active == true end
+        if VisualsTab.Visible ~= nil then return VisualsTab.Visible == true end
+        if VisualsTab.Page and VisualsTab.Page:IsA("GuiObject") then
+            return VisualsTab.Page.Visible == true
+        end
+        if ESPGroup and ESPGroup.Container then
+            local curr = ESPGroup.Container
+            while curr and curr ~= Library.ScreenGui and curr ~= workspace do
+                if curr:IsA("GuiObject") and not curr.Visible then
+                    return false
+                end
+                curr = curr.Parent
+            end
+            return true
+        end
+        return false
     end
 
     -- Math helper: Local projection from 3D world coordinates into espViewport pixel coordinates (0..vpW, 0..vpH)
@@ -2693,10 +2727,13 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                     elseif v:IsA("BasePart") then
                         v.Anchored = true
                         v.CanCollide = false
+                        if v.Name == "HumanoidRootPart" then
+                            v.Transparency = 1
+                        end
                         originalPartProps[v] = {
                             Color = v.Color,
                             Material = v.Material,
-                            Transparency = v.Transparency
+                            Transparency = (v.Name == "HumanoidRootPart") and 1 or v.Transparency
                         }
                     end
                 end
@@ -2724,7 +2761,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
 
         local mainWin = getMainFrame()
         local winHeight = mainWin and mainWin.AbsoluteSize.Y or 460
-        local previewW = 390 -- Wide, spacious preview window!
+        local previewW = 315 -- Compact & perfectly proportioned preview window!
 
         -- Outer Panel (anchored to main window, themed accent border)
         espPreviewPanel = Instance.new("Frame")
@@ -2974,6 +3011,20 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         pvDistText.Visible = false
         pvDistText.Parent = pvOverlayContainer
 
+        -- Preview Weapon Text
+        pvWeaponText = Instance.new("TextLabel")
+        pvWeaponText.Name = "PreviewWeaponText"
+        pvWeaponText.BackgroundTransparency = 1
+        pvWeaponText.Font = Enum.Font.Gotham
+        pvWeaponText.TextSize = 10
+        pvWeaponText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        pvWeaponText.TextStrokeTransparency = 0
+        pvWeaponText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        pvWeaponText.Text = "[Wooden Rod]"
+        pvWeaponText.ZIndex = 508
+        pvWeaponText.Visible = false
+        pvWeaponText.Parent = pvOverlayContainer
+
         -- Preview Head Dot
         pvHeadDot = Instance.new("Frame")
         pvHeadDot.Name = "PreviewHeadDot"
@@ -3037,6 +3088,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             pvHealthText = nil
             pvNameText = nil
             pvDistText = nil
+            pvWeaponText = nil
             pvHeadDot = nil
             table.clear(originalPartProps)
         end
@@ -3058,19 +3110,21 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         local mainWin = getMainFrame()
         local isMenuOpen = Library.Toggled and (mainWin and mainWin.Visible) and Library.ScreenGui.Enabled
         local isToggleOn = Library.Toggles.ESPPreviewToggle and Library.Toggles.ESPPreviewToggle.Value
+        local isTabActive = isVisualsTabActive()
 
-        if not (isMenuOpen and isToggleOn) then
+        -- ESP Preview ONLY shows when menu is open, toggle is ON, AND the user is in the Visuals tab!
+        if not (isMenuOpen and isToggleOn and isTabActive) then
             espPreviewPanel.Visible = false
             return
         end
 
         espPreviewPanel.Visible = true
 
-        -- Match main window height & anchor right next to it with 10px gap
+        -- Match main window height & anchor right next to it with 8px gap
         local mainPos = mainWin.AbsolutePosition
         local mainSize = mainWin.AbsoluteSize
-        local previewW = math.clamp(math.floor(mainSize.X * 0.70), 380, 460)
-        local gap = 10
+        local previewW = math.clamp(math.floor(mainSize.X * 0.52), 295, 335)
+        local gap = 8
 
         local targetX = mainPos.X + mainSize.X + gap
         -- Responsive check for narrow screens / mobile: flip to left side if no space on right
@@ -3099,26 +3153,46 @@ function MounxHub:BuildVisuals(VisualsTab, options)
         end
 
         -- ============================================================
-        -- LIVE CHAMS HANDLING IN PREVIEW (Translucent holographic glow like real Highlight!)
+        -- LIVE CHAMS HANDLING IN PREVIEW (Translucent glow like real Highlight!)
         -- ============================================================
         if worldModel then
             local isChams = Library.Toggles.ChamsESP and Library.Toggles.ChamsESP.Value
             local chamCol = Library.Options.ChamsColorVisible and Library.Options.ChamsColorVisible.Value or Color3.fromRGB(255, 107, 157)
+
+            -- Native Highlight instance in WorldModel
+            local pvHl = worldModel:FindFirstChild("PreviewHighlight")
+            if not pvHl then
+                pvHl = Instance.new("Highlight")
+                pvHl.Name = "PreviewHighlight"
+                pvHl.Adornee = worldModel:FindFirstChildWhichIsA("Model")
+                pvHl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                pvHl.FillTransparency = 0.5
+                pvHl.OutlineTransparency = 0
+                pvHl.Parent = worldModel
+            end
+            pvHl.FillColor = chamCol
+            pvHl.Enabled = isChams
+
             for _, part in ipairs(worldModel:GetDescendants()) do
                 if part:IsA("BasePart") then
-                    local orig = originalPartProps[part]
-                    if isChams then
-                        part.Color = chamCol
-                        part.Material = Enum.Material.Neon
-                        part.Transparency = 0.42 -- Translucent holographic glow, showing clothes and shape!
+                    if part.Name == "HumanoidRootPart" then
+                        -- HumanoidRootPart must ALWAYS be 100% invisible!
+                        part.Transparency = 1
                     else
-                        if orig then
-                            part.Color = orig.Color
-                            part.Material = orig.Material
-                            part.Transparency = orig.Transparency
-                        else
+                        local orig = originalPartProps[part]
+                        if isChams then
+                            part.Color = chamCol
                             part.Material = Enum.Material.SmoothPlastic
-                            part.Transparency = 0
+                            part.Transparency = 0.40
+                        else
+                            if orig then
+                                part.Color = orig.Color
+                                part.Material = orig.Material
+                                part.Transparency = orig.Transparency
+                            else
+                                part.Material = Enum.Material.SmoothPlastic
+                                part.Transparency = 0
+                            end
                         end
                     end
                 end
@@ -3137,6 +3211,7 @@ function MounxHub:BuildVisuals(VisualsTab, options)
             if pvHealthText then pvHealthText.Visible = false end
             if pvNameText then pvNameText.Visible = false end
             if pvDistText then pvDistText.Visible = false end
+            if pvWeaponText then pvWeaponText.Visible = false end
             if pvHeadDot then pvHeadDot.Visible = false end
             return
         end
@@ -3310,9 +3385,19 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 pvHealthBarFill.Size = UDim2.new(1, 0, previewHPPercent, 0)
                 pvHealthBarFill.Position = UDim2.new(0, 0, 1 - previewHPPercent, 0)
 
-                local customHpColor = Library.Options.HealthBarColor and Library.Options.HealthBarColor.Value
-                local dynamicHpColor = Color3.fromRGB(255, 45, 45):Lerp(Color3.fromRGB(45, 255, 110), previewHPPercent)
-                pvHealthBarFill.BackgroundColor3 = customHpColor or dynamicHpColor
+                local isColorBased = (Library.Toggles.HealthBarColorBased == nil) or (Library.Toggles.HealthBarColorBased and Library.Toggles.HealthBarColorBased.Value)
+                local hpColor
+                if isColorBased then
+                    if previewHPPercent > 0.5 then
+                        hpColor = Color3.fromRGB(255, 215, 0):Lerp(Color3.fromRGB(45, 255, 110), (previewHPPercent - 0.5) * 2)
+                    else
+                        hpColor = Color3.fromRGB(255, 40, 40):Lerp(Color3.fromRGB(255, 215, 0), previewHPPercent * 2)
+                    end
+                else
+                    local customHpColor = Library.Options.HealthBarColor and Library.Options.HealthBarColor.Value
+                    hpColor = customHpColor or Color3.fromRGB(45, 255, 110)
+                end
+                pvHealthBarFill.BackgroundColor3 = hpColor
 
                 if Library.Toggles.HealthBarText and Library.Toggles.HealthBarText.Value then
                     pvHealthText.Visible = true
@@ -3358,7 +3443,28 @@ function MounxHub:BuildVisuals(VisualsTab, options)
                 pvDistText.Visible = false
             end
 
-            -- 5. Preview Head Dot
+            -- 5. Preview Weapon Text
+            if Library.Toggles.WeaponESP and Library.Toggles.WeaponESP.Value then
+                if pvWeaponText then
+                    pvWeaponText.Visible = true
+                    local tool = LocalPlayer and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    local wName = tool and ("[" .. tool.Name .. "]") or (isNPCTarget and "[Iron Claws]" or "[Wooden Rod]")
+                    pvWeaponText.Text = wName
+                    pvWeaponText.TextColor3 = textColor
+                    pvWeaponText.TextSize = math.max(9, textSize - 2)
+
+                    local wOffset = boxY + boxH + 4
+                    if Library.Toggles.DistanceESP and Library.Toggles.DistanceESP.Value then
+                        wOffset = wOffset + 14
+                    end
+                    pvWeaponText.Position = UDim2.new(0, boxX - 40, 0, wOffset)
+                    pvWeaponText.Size = UDim2.new(0, boxW + 80, 0, 14)
+                end
+            else
+                if pvWeaponText then pvWeaponText.Visible = false end
+            end
+
+            -- 6. Preview Head Dot
             if Library.Toggles.HeadDotESP and Library.Toggles.HeadDotESP.Value then
                 local headPos = Vector3.new(0, 2.0, 0)
                 local hpPoint, hpVis = worldToPreviewPoint(headPos)
